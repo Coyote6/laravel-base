@@ -1,6 +1,6 @@
 # Laravel Base
 
-This is just a collection of commonly used traits that are used throughout my sites and packages, such as UUID's and autofilling author_id fields on models.
+This is just a collection of commonly used traits that are used throughout my sites and packages, such as UUIDs and autofilling author_id fields on models.
 
 ## To use
 1. Select which traits you would like to implement.
@@ -97,7 +97,7 @@ class Example extends Model {
 
 }
 ```
-This example auto adds a uuid as the `id`, the user's id and client id as `author_id` and `client_id` respectfully, and a machine `name_based` on the `name` if not filled in on creation.
+This example auto adds a uuid as the `id`, the user\'s id and client id as `author_id` and `client_id` respectfully, and a machine `name_based` on the `name` if not filled in on creation.
 
 
 ### Get As Options Example
