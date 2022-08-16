@@ -26,6 +26,6 @@
             "providers": [
                 "Coyote6\\LaravelBase\\BaseServiceProvider"
             ]
-        },
+        }
     }
 }
