@@ -2,7 +2,7 @@
     "name": "coyote6/laravel-base",
     "type": "library",
     "description": "Provides common base classes used for some of Coyote6 GraphX's developed projects.  Provides UUID trait for models using it as a primary key.  Provides trait methods to return models as options.",
-    "keywords": ["laravel"],
+    "keywords": ["laravel, traits"],
     "homepage": "https://coyote6.com",
     "license": "MIT",
     "authors": [
@@ -24,7 +24,7 @@
     "extra": {
         "laravel": {
             "providers": [
-                "Coyote6\\LaravelBase\\BaseServiceProvider"
+                "Coyote6\\LaravelBase\\Providers\\BaseServiceProvider"
             ]
         }
     }
