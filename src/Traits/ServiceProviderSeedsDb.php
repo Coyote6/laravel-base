@@ -1,7 +1,7 @@
 <?php
 	
 	
-namespace App\Traits;
+namespace Coyote6\LaravelBase\Traits;
 
 //
 // Seeder script based on the answer by Huy Nguyen
@@ -44,9 +44,12 @@ trait ServiceProviderSeedsDb {
     //
     protected function isSeedCommand () : bool {
         $args = Request::server('argv', null);
-        if (is_array($args)) {
+        if (is_array ($args)) {
             $command = implode (' ', $args);
-            if (str_contains ($command, ['db:seed', '--seed']) && !str_contains ($command, [ '--class', 'help', '-h' ])) {
+            if (
+            	(str_contains ($command, 'db:seed') || str_contains ($command, '--seed')) && 
+            	!str_contains ($command, '--class') && !str_contains ($command,'help') && !str_contains ($command, '-h')
+            ) {
                 return true;
             }
         }
