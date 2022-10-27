@@ -1,7 +1,7 @@
 <?php
 	
 	
-namespace App\Traits;
+namespace Coyote6\LaravelBase\Traits;
 
 
 trait ReadsCsv {
