@@ -15,12 +15,11 @@ trait BootTraits {
 		parent::boot();
 		
 		static::creating(function ($model) {
-				
+			
 			if (method_exists ($model, 'modelCreating')) {
-				$model->modelCreating();
-				
-			}
-					
+        		$model->modelCreating();
+    		}
+						
 			if (method_exists ($model, 'createAuthor')) {
 				$model->createAuthor();
 				
