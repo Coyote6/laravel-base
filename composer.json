@@ -19,7 +19,10 @@
     "autoload": {
         "psr-4": {
             "Coyote6\\LaravelBase\\": "src/"
-        }
+        },
+        "files": [
+	        "src/Helpers/Helpers.php"
+	    ]
     },
     "extra": {
         "laravel": {
