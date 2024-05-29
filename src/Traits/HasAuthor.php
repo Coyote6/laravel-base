@@ -8,7 +8,10 @@ trait HasAuthor {
 
 	public function createAuthor () {
 		if (is_null ($this->author_id) || $this->author_id == '') {
-			$this->author_id = $this->getUserId();
+			$userId = $this->getUserId();
+			if ($userId != 0) {
+				$this->author_id = $userId;
+			}
 		}
 		
 		// The original author id is a fallback field for when we there is a foreign key 
