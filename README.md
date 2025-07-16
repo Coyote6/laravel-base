@@ -81,7 +81,8 @@ class Example extends Model {
     use HasFactory, 
     	HasUuid,
     	HasAuthor,
-    	HasClient
+		HasMachineName,
+    	HasClient,
     	BootTraits;
     
     public $incrementing = false;
