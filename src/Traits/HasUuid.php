@@ -4,14 +4,14 @@
 namespace Coyote6\LaravelBase\Traits;
 
 
-use Webpatser\Uuid\Uuid as WebpatserUuid;
+use Illuminate\Support\Str;
 
 
 trait HasUuid {
 	
 	public function createUuid () {
 		if (is_null ($this->{$this->getKeyName()}) || $this->{$this->getKeyName()} == '') {
-			$this->{$this->getKeyName()} = WebpatserUuid::generate()->string;
+			$this->{$this->getKeyName()} = Str::uuid()->toString();
 		}
 	}  
   

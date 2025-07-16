@@ -13,9 +13,7 @@
             "role": "Developer"
         }
     ],
-    "require": {
-	    "webpatser/laravel-uuid" : "^4.0"
-    },
+    "require": {},
     "autoload": {
         "psr-4": {
             "Coyote6\\LaravelBase\\": "src/"
