@@ -1,15 +1,25 @@
 <?php
   
   
-namespace Coyote6\LaravelBase\Traits;
-
-
-use App\Models\User;
+namespace Coyote6\LaravelBase\Traits\Models;
 
 
 trait BootTraits {
 
 		
+	// Boot
+	//
+	// Registers Eloquent model-event listeners that call each optional
+	// convention method when it exists on the model: createAuthor,
+	// createOriginalAuthor, createClient, createMachineName, createSlug, and
+	// createUuid on creating; modelCreating/modelCreated on create;
+	// modelUpdating/modelUpdated on update; modelDeleting/modelDeleted on
+	// delete. A model opts into any of this behavior just by defining the
+	// matching method itself, or by composing the trait that defines it --
+	// this trait never requires any of them to exist.
+	//
+	// @return void
+	//
 	protected static function boot() {
 	
 		parent::boot();
@@ -22,9 +32,14 @@ trait BootTraits {
 						
 			if (method_exists ($model, 'createAuthor')) {
 				$model->createAuthor();
-				
+
 			}
-			
+
+			if (method_exists ($model, 'createOriginalAuthor')) {
+				$model->createOriginalAuthor();
+
+			}
+
 			if (method_exists ($model, 'createClient')) {
 				$model->createClient();
 				
@@ -32,9 +47,14 @@ trait BootTraits {
 			
 			if (method_exists ($model, 'createMachineName')) {
 				$model->createMachineName();
-				
+
 			}
-			
+
+			if (method_exists ($model, 'createSlug')) {
+				$model->createSlug();
+
+			}
+
 			if (method_exists ($model, 'createUuid')) {
 				$model->createUuid();
 				
@@ -72,24 +92,6 @@ trait BootTraits {
 			}
 	    });
 	
-	}
-
-
-	public static function getUserId () {
-		$user = auth()->user();
-		if (is_object ($user)) {
-			return $user->getKey();
-		}
-		return 0;
-	}
-	
-	
-	public static function getUser () {
-		$user = auth()->user();
-		if (!is_object ($user)) {
-			return $user;
-		}
-		return User::make();		
 	}
   
 

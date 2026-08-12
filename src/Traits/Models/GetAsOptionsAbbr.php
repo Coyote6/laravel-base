@@ -1,11 +1,18 @@
 <?php
 
 
-namespace Coyote6\LaravelBase\Traits;
+namespace Coyote6\LaravelBase\Traits\Models;
 
 
 trait GetAsOptionsAbbr {
 	
+	// Get As Options
+	//
+	// Returns every record as an abbr => name option list, ordered by name.
+	// Cached in a static variable after the first call.
+	//
+	// @return array
+	//
 	static public function getAsOptions () {
 		
 		static $options; 

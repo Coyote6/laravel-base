@@ -4,29 +4,35 @@
 namespace Coyote6\LaravelBase\Providers;
 
 
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
-use Illuminate\View\Compilers\BladeCompiler;
 	
 		
 class BaseServiceProvider extends ServiceProvider {
 	
 
-	/**
-	 * Register services.
-	 *
-	 * @return void
-	 */
-	public function register() {}
+	// Register
+	//
+	// Merges this package's config into the application's config repository.
+	//
+	// @return void
+	//
+	public function register() {
+		$this->mergeConfigFrom (__DIR__ . '/../../config/coyote6-base.php', 'coyote6-base');
+	}
 
 
-	/**
-	 * Bootstrap services.
-	 *
-	 * @return void
-	 */
-	public function boot() {}
+	// Boot
+	//
+	// Publishes this package's config so it can be customized in the
+	// consuming application.
+	//
+	// @return void
+	//
+	public function boot() {
+		$this->publishes([
+			__DIR__ . '/../../config/coyote6-base.php' => config_path('coyote6-base.php'),
+		], 'coyote6-base-config');
+	}
   
 
 }

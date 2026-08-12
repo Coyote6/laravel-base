@@ -1,7 +1,7 @@
 <?php
 	
 	
-namespace Coyote6\LaravelBase\Traits;
+namespace Coyote6\LaravelBase\Traits\Database;
 
 //
 // Seeder script based on the answer by Huy Nguyen
@@ -21,11 +21,17 @@ trait ServiceProviderSeedsDb {
 	protected $seederDir;
 	
 	
+	// Seed Db On Command
 	//
-	// If the app is running from the console,
-	// check the commmand to see if it is a seed command
+	// If the app is running from the console, checks the command to see if
+	// it is a seed command, and if so hooks
+	// addSeedsAfterConsoleCommandFinished() to run after it completes.
 	//
-	protected function seedDbOnCommand ($dir) {
+	// @param $dir string - The directory containing this package's seeder files
+	//
+	// @return void
+	//
+	protected function seedDbOnCommand ($dir): void {
 		$this->seederDir = $dir;
 		if ($this->app->runningInConsole()) {
             if ($this->isSeedCommand()) {
@@ -35,10 +41,10 @@ trait ServiceProviderSeedsDb {
     }
 	
 	
+	// Is Seed Command
 	//
-    // Get the current commands arguments, and see if they
-    // contain db:seed or --seed and do not include
-    // --class, help, or -h.
+    // Gets the current command's arguments, and checks whether they contain
+    // db:seed or --seed and do not include --class, help, or -h.
     //
     // @return bool
     //
@@ -57,10 +63,15 @@ trait ServiceProviderSeedsDb {
     }
     
     
-    /**
-     * Add seeds from the $seed_path after the current command in console finished.
-     */
-    protected function addSeedsAfterConsoleCommandFinished () {
+    // Add Seeds After Console Command Finished
+    //
+    // Registers a listener that runs addSeeds() once the current console
+    // command finishes, but only for real console commands (not calls made
+    // via Artisan::call()).
+    //
+    // @return void
+    //
+    protected function addSeedsAfterConsoleCommandFinished (): void {
         Event::listen (CommandFinished::class, function (CommandFinished $event) {
             //
             // Accept command in console only,
@@ -72,11 +83,13 @@ trait ServiceProviderSeedsDb {
         });
     }
     
+
+    // Add Seeds
     //
-    // Loop through the seeded directory and call
-    // db:seed on each file.
+    // Loops through the seeder directory and calls db:seed on each seeder
+    // class found in it.
     //
-    // @return null
+    // @return void
     //
     protected function addSeeds () {
         $file_names = glob ($this->seederDir . '/*.php');
@@ -89,11 +102,13 @@ trait ServiceProviderSeedsDb {
     }
 	
 	
+	// Get Classes From File
 	//
-    // Get full class names declared in the specified file.
+    // Gets the fully-qualified class names declared in the given file.
     //
-    // @param string $filename
-    // @return [] (class names)
+    // @param $filename string - Path to the PHP file to inspect
+    //
+    // @return array
     //
     private function getClassesFromFile (string $filename) : array {
         
@@ -128,5 +143,6 @@ trait ServiceProviderSeedsDb {
 
         return $classes;
     }
+
 
 }

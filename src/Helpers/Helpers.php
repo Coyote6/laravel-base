@@ -1,64 +1,39 @@
 <?php
-	
 
+
+// Get Current User Id
 //
-// @return string || null
+// Helper function to return the current authenticated user's id
+// or null if not found.
 //
-if (!function_exists('getCurrentUserClientId')) {
-	function getCurrentUserClientId () {
+// @return int|string|null - Return type depends on the key's type
+//
+if (!function_exists('getCurrentUserId')) {
+function getCurrentUserId (): int|string|null {
 		$user = auth()->user();
 		if ($user) {
-			return $user->client_id;
+			return $user->getKey();
 		}
 		return null;
 	}
 }
 
-//
-// Change string to snake case.
-//
-// @return void
-//
-if (!function_exists('toSnakeCase')) {
-	function toSnakeCase (string $str) {
-		
-		// Replace spaces and special characters with underscores
-		$snakeCase = preg_replace('/[^A-Za-z0-9]+/', '_', $str);
-		
-		// Convert to lowercase
-		$snakeCase = strtolower($snakeCase);
-		
-		// Remove leading and trailing underscores
-		$snakeCase = trim($snakeCase, '_');
-		return $snakeCase;
-		
-	}
-}
 
-
+// Get Current User Client Id
 //
-// @alias to toSnakeCase()
+// Helper function to return the current authenticated user's client id
+// (per the coyote6-base.client.reference config value) or null if not
+// found.
 //
-if (!function_exists('createMachineName')) {
-	function createMachineName (string $str) {
-		return toSnakeCase ($str);
-	}
-}
-
-
+// @return int|string|null
 //
-// Change camelcase keys to snake case.
-//
-// @return void
-//
-if (!function_exists('snakeCaseKeys')) {
-	function snakeCaseKeys (array &$array) {
-		foreach ($array as $key => $val) {
-			$newKey = strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $key));
-			if ($newKey != $key && !isset ($array[$newKey])) {
-				$array[$newKey] = $val;
-				unset ($array[$key]);
-			}
+if (!function_exists('getCurrentUserClientId')) {
+	function getCurrentUserClientId (): int|string|null {
+		$user = auth()->user();
+		if ($user) {
+            return $user->{config('coyote6-base.client.reference', 'client_id')};
 		}
+		return null;
 	}
 }
+

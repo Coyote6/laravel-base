@@ -13,7 +13,9 @@
             "role": "Developer"
         }
     ],
-    "require": {},
+    "require": {
+        "coyote6/laravel-str": "*"
+    },
     "autoload": {
         "psr-4": {
             "Coyote6\\LaravelBase\\": "src/"

@@ -1,16 +1,22 @@
 <?php
 	
 	
-namespace Coyote6\LaravelBase\Traits;
+namespace Coyote6\LaravelBase\Traits\Files;
 
 
 trait ReadsCsv {
 	
 	
+	// Get Items From CSV
+	//
+	// Reads the CSV file at $pathToFile and returns each row as an
+	// associative array keyed by the header row's column names.
+	//
+	// @param $pathToFile string - Path to the CSV file to read
 	//
 	// @return array
 	//
-	protected function getItemsFromCSV (string $pathToFile = null) {
+	protected function getItemsFromCSV (string $pathToFile): array {
 		
 		$fh = fopen ($pathToFile, 'r');
 		$items = [];
