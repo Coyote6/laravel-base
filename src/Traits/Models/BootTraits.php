@@ -54,11 +54,6 @@ trait BootTraits {
 				$model->createSlug();
 
 			}
-
-			if (method_exists ($model, 'createUuid')) {
-				$model->createUuid();
-				
-			}
 			
         });
         

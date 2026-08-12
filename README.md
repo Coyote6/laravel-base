@@ -1,6 +1,6 @@
 # Laravel Base
 
-A collection of small Laravel traits and helpers shared across Coyote6 GraphX projects — mainly Eloquent model creation-time conventions (author/client/machine name/slug stamping), select-option helpers, and a couple of database/file utilities.
+A collection of small Laravel traits and helpers — mainly Eloquent model creation-time conventions (author/client/machine name/slug stamping), select-option helpers, and a couple of database/file utilities.
 
 ## Installation
 
@@ -18,9 +18,9 @@ This publishes `config/coyote6-base.php` into your application.
 
 ## Directory Structure
 
-- `src/Traits/Models/` — Traits meant to be `use`d directly on Eloquent models: `BootTraits`, `GetAsOptions`, `GetAsOptionsAbbr`, `GetBySlug`.
+- `src/Traits/Models/` — Traits meant to be used directly on Eloquent models: `BootTraits`, `GetAsOptions`, `GetAsOptionsAbbr`, `GetBySlug`.
 - `src/Traits/Models/Boot/` — Creation-helper traits that provide the `create*` hook methods `BootTraits` looks for via `method_exists()`: `Author`, `OriginalAuthor`, `Client`, `MachineName`, `MachineNameAsId`, `Slug`, and the shared internal helper `ResolvesMachineName`. Always used alongside `BootTraits` on the model, never alone.
-- `src/Traits/Database/` — Traits meant to be `use`d on service providers, migrations, or other database-related classes: `DropsIndexes`, `ServiceProviderSeedsDb`.
+- `src/Traits/Database/` — Traits meant to be used on service providers, migrations, or other database-related classes: `DropsIndexes`, `ServiceProviderSeedsDb`.
 - `src/Traits/Files/` — `ReadsCsv`, for reading a CSV file into an array.
 - `src/Helpers/Helpers.php` — Global helper functions (`getCurrentUserId()`, `getCurrentUserClientId()`), autoloaded on every request via composer's `files` autoload.
 - `src/Providers/BaseServiceProvider.php` — Merges and publishes `config/coyote6-base.php`.
@@ -54,7 +54,7 @@ All config lives under the `coyote6-base` key. Every `field`/`reference` option 
 
 `Coyote6\LaravelBase\Traits\Models\BootTraits` — registers Eloquent model-event listeners (`creating`, `created`, `updating`, `updated`, `deleting`, `deleted`) that call a matching convention method on the model if it exists: `createAuthor`, `createOriginalAuthor`, `createClient`, `createMachineName`, `createSlug`, `createUuid` on `creating`; `modelCreating`/`modelCreated`/`modelUpdating`/`modelUpdated`/`modelDeleting`/`modelDeleted` at their respective events. A model opts into any of this just by defining the method — directly, or via one of the `Boot/*` traits below — `BootTraits` itself never requires any of them to exist.
 
-For UUID primary keys, use Laravel's native `Illuminate\Database\Eloquent\Concerns\HasUuids` trait — this package doesn't ship its own `createUuid`, though the `BootTraits` hook for it is still there if you want to define one yourself.
+For UUID primary keys, use Laravel's native `Illuminate\Database\Eloquent\Concerns\HasUuids` trait — this package no longer ships its own `Uuid` method.
 
 ### Creation Helpers (require `BootTraits`)
 
@@ -121,12 +121,12 @@ use Illuminate\Database\Eloquent\Model;
 
 class Example extends Model {
 
-    use HasFactory,
-        Author,
-        Client,
-        MachineName,
-        Slug,
-        BootTraits;
+    use HasFactory;
+    use Author;
+    use Client;
+    use MachineName;
+    use Slug;
+    use BootTraits;
 
     public $incrementing = false;
     protected $keyType = 'string';
@@ -150,13 +150,24 @@ On create, this fills `author_id` and `client_id` from the current user, and gen
 Add alongside `Author` for a permanent, foreign-key-free record of the original author (useful when `author_id` has an `ON DELETE SET NULL` foreign key and could later be nulled out):
 
 ```php
+<?php
+
+use Coyote6\LaravelBase\Traits\Models\BootTraits;
 use Coyote6\LaravelBase\Traits\Models\Boot\Author;
 use Coyote6\LaravelBase\Traits\Models\Boot\OriginalAuthor;
 
 class Example extends Model {
-    use Author, OriginalAuthor, BootTraits;
+    
+    use Author;
+    use OriginalAuthor;
+    use BootTraits;
+    
     // ...
-    protected $fillable = ['id', 'author_id', 'original_author_id'];
+    protected $fillable = [
+        'id', 
+        'author_id', 
+        'original_author_id',
+    ];
 }
 ```
 
@@ -165,15 +176,22 @@ class Example extends Model {
 When the machine name itself should be the primary key, use `MachineNameAsId` instead of `MachineName`:
 
 ```php
+<?php
+
 use Coyote6\LaravelBase\Traits\Models\Boot\MachineNameAsId;
 
 class Example extends Model {
-    use MachineNameAsId, BootTraits;
+    
+    use MachineNameAsId;
+    use BootTraits;
 
     public $incrementing = false;
     protected $keyType = 'string';
 
-    protected $fillable = ['id', 'name'];
+    protected $fillable = [
+        'id', 
+        'name',
+    ];
 }
 ```
 
@@ -206,8 +224,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class Example extends Model {
 
-    use HasFactory,
-        GetAsOptions;
+    use HasFactory;
+    use GetAsOptions;
 
     public $incrementing = false;
     protected $keyType = 'string';
@@ -230,9 +248,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Example;
 
 class ExampleController extends Controller {
+    
     public function index () {
         dd (Example::getAsOptions());
     }
+    
 }
 ```
 
@@ -270,7 +290,20 @@ class Example extends Model {
 ```
 
 ```php
-dd (Example::getAsOptions());
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Controllers\Controller;
+use App\Models\Example;
+
+class ExampleController extends Controller {
+    
+    public function index () {
+        dd (Example::getAsOptions());
+    }
+    
+}
 ```
 
 ### Get By Slug
