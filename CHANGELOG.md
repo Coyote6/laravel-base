@@ -58,6 +58,10 @@ Behavioral changes beyond the namespace/class renames:
 - `ResolvesMachineName` trait (internal, composed by `MachineName` and
   `MachineNameAsId`) — resolves `machine_name.method` against an allowlist
   of `Str::` methods/macros, running every one through `Str::ascii()` first.
+- `php artisan coyote6-base:upgrade` — finds and rewrites old (pre-0.3.0)
+  trait references to their new namespace across a consuming app. Dry-run
+  by default; `--apply` writes the changes. See README's "Upgrade From
+  0.2.7" section.
 - `config/coyote6-base.php` — publishable config covering every
   field/reference/method option across `machine_name`, `author`,
   `original_author`, `client`, and `slug`.

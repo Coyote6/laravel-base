@@ -1,0 +1,64 @@
+<?php
+
+
+namespace Coyote6\LaravelBase\Upgrades;
+
+
+interface UpgradeStep {
+
+
+	// Version
+	//
+	// The coyote6/laravel-base version this step upgrades a consuming
+	// application to.
+	//
+	// @return string
+	//
+	public function version (): string;
+
+
+	// Rewrite
+	//
+	// Returns $contents with every applicable change for this step
+	// applied. Must be idempotent -- safe to call against a file this step
+	// doesn't apply to, or has already been applied to, since
+	// UpgradeCommand always re-scans from scratch rather than tracking
+	// which steps already ran against a given application.
+	//
+	// @param $contents string - The file contents to rewrite
+	//
+	// @return string
+	//
+	public function rewrite (string $contents): string;
+
+
+	// Conflicts
+	//
+	// Checks $contents for changes this step would normally apply that
+	// instead need manual attention -- e.g. a name this step would
+	// introduce is already bound to something unrelated in this file.
+	// Anything reported here must NOT also be applied by rewrite().
+	//
+	// @param $contents string - The file contents to inspect
+	//
+	// @return array Old FQCN => description of what's blocking it, one
+	//               entry per conflict found
+	//
+	public function conflicts (string $contents): array;
+
+
+	// Flagged
+	//
+	// Checks $contents for old references this step recognizes but
+	// deliberately never rewrites automatically (no safe 1:1 replacement)
+	// -- these need the developer's own manual decision.
+	//
+	// @param $contents string - The file contents to inspect
+	//
+	// @return array Old FQCN => suggested new FQCN, one entry per old
+	//               reference found
+	//
+	public function flagged (string $contents): array;
+
+
+}

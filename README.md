@@ -16,6 +16,97 @@ php artisan vendor:publish --tag=coyote6-base-config
 
 This publishes `config/coyote6-base.php` into your application.
 
+## Upgrade From 0.2.7
+
+v0.3.0 is a breaking release. See `CHANGELOG.md` for the full old-namespace →
+new-namespace table — every trait moved, and four were renamed
+(`HasAuthor`/`HasClient`/`HasMachineName`/`HasMachineNameAsId` →
+`Author`/`Client`/`MachineName`/`MachineNameAsId`). There's no deprecation
+shim; it's a hard cutover.
+
+**Automating the namespace rename.** This package ships a command that scans
+your application and rewrites old trait references to whatever the current
+version needs:
+
+```bash
+php artisan coyote6-base:upgrade
+```
+
+It scans `app/` and `database/` by default (comma-separate `--path` to scan
+somewhere else, e.g. `--path=app,database,routes`), then runs every upgrade
+step it knows about, one at a time — currently just the v0.2.7 → v0.3.0
+rename below, but future breaking releases will add their own step here, so
+running this command again after a later update only applies whatever's
+actually new. Each step reports on its own:
+
+```
+Running v0.3.0 upgrades
+Found 12 files that would change. Apply the changes? (yes/no) [no]:
+```
+
+Answer `yes` to write that step's changes, or `no` to leave them untouched
+and move on to the next step. Pass `--apply` to skip the prompt and write
+immediately instead — useful in CI or any other non-interactive context:
+
+```bash
+php artisan coyote6-base:upgrade --apply
+```
+
+A step with nothing left to do prints `No file changes found.` and moves on
+without asking anything, so it's safe to re-run this command at any time,
+even after it's already been applied.
+
+It rewrites both the `use` import statement and the bare `use ShortName;`
+trait-inclusion line inside a class body, for every renamed/moved trait —
+including an aliased import (`use Coyote6\LaravelBase\Traits\HasAuthor as
+Whatever;`), which keeps your alias and only swaps the underlying
+namespace. Two situations it can't safely handle automatically, and lists
+in the output instead so you can review them by hand:
+
+- **A new name would collide with something else already imported in that
+  file** — e.g. the file already has an unrelated `use App\Models\Author;`,
+  and the rename would need to introduce its own `use ...\Author;`. That
+  specific rename is skipped (everything else in the file still gets
+  rewritten normally), and the file is listed under a "collide with a
+  different, already-imported class" warning.
+- **`HasUuid` has no direct replacement** (switch to Laravel's native
+  `Illuminate\Database\Eloquent\Concerns\HasUuids` — see Boot Method above
+  for the behavior difference), so files referencing it are flagged in the
+  output rather than modified.
+
+Review the diff and run your own test suite before committing — this is a
+straightforward textual rewrite, not a full PHP-aware refactor, so give it
+a look rather than trusting it blindly on generated or unusually formatted
+code.
+
+**If your database columns don't match the new defaults.** `Author`,
+`Client`, `MachineName`, `MachineNameAsId`, and `Slug` used to hardcode which
+attribute they read from/wrote to (`author_id`, `client_id`, `machine_name`,
+`name`). Those are now config-driven (`field`/`reference` under each
+section — see Configuration below), and the defaults match the old hardcoded
+names exactly, so most upgrades need no config changes at all. If any of
+your tables already used different column names for these before upgrading,
+publish the config and point `field`/`reference` at your existing columns
+instead of renaming the database:
+
+```php
+// config/coyote6-base.php
+'author' => [
+    'field' => 'user_id', // was hardcoded to 'author_id' before v0.3.0
+],
+```
+
+**`machine_name`'s default generation method changed.** Before v0.3.0,
+`MachineName`/`MachineNameAsId` always lowercased and replaced every
+non-alphanumeric character with an underscore — snake_case-shaped output.
+The new default is `strictKebab` (dash-separated), since that's now the
+package-wide default `machine_name.method`. If your existing `machine_name`
+values (or anything reading them) depend on the old underscore-separated
+format, publish the config and set `machine_name.method` explicitly to
+whichever option in the Method table matches what you already have —
+otherwise newly-created records will get dash-separated values alongside
+your existing underscore-separated ones.
+
 ## Directory Structure
 
 - `src/Traits/Models/` — Traits meant to be used directly on Eloquent models: `BootTraits`, `GetAsOptions`, `GetAsOptionsAbbr`, `GetBySlug`.
