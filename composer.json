@@ -14,7 +14,12 @@
         }
     ],
     "require": {
-        "coyote6/laravel-str": "*"
+        "coyote6/laravel-str": "^1.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^9.0|^10.0|^11.0",
+        "pestphp/pest": "^4.7",
+        "pestphp/pest-plugin-laravel": "^4.1"
     },
     "autoload": {
         "psr-4": {
@@ -24,11 +29,26 @@
 	        "src/Helpers/Helpers.php"
 	    ]
     },
+    "autoload-dev": {
+        "psr-4": {
+            "Coyote6\\LaravelBase\\Tests\\": "tests/"
+        }
+    },
     "extra": {
         "laravel": {
             "providers": [
                 "Coyote6\\LaravelBase\\Providers\\BaseServiceProvider"
             ]
         }
-    }
+    },
+    "scripts": {
+        "test": "@php vendor/bin/pest"
+    },
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
 }
