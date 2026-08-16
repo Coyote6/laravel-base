@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-08-13
+
+### Added
+
+- `php artisan coyote6-base:upgrade` — runs every registered upgrade step
+  against a consuming application, each rewriting old trait references to
+  whatever that step's target version needs. Currently ships one step, the
+  v0.2.7 → v0.3.0 rename described below. Scans `app/` and `database/` by
+  default (`--path` to override); reports a per-step file count and asks
+  for confirmation before writing, or pass `--apply` to skip the prompt and
+  write immediately (e.g. in CI). A rename is skipped and listed separately
+  for manual review, rather than applied blindly, when it would collide
+  with an unrelated class already imported under the same short name in a
+  file. See README's "Upgrade From 0.2.7" section.
+- `Coyote6\LaravelBase\Upgrades\UpgradeStep` interface — the extension
+  point future breaking releases use to add their own upgrade step
+  alongside `Upgrade_0_3_0`, without changing `UpgradeCommand` itself.
+
 ## [0.3.0] - 2026-08-13
 
 ### Breaking
@@ -58,10 +76,6 @@ Behavioral changes beyond the namespace/class renames:
 - `ResolvesMachineName` trait (internal, composed by `MachineName` and
   `MachineNameAsId`) — resolves `machine_name.method` against an allowlist
   of `Str::` methods/macros, running every one through `Str::ascii()` first.
-- `php artisan coyote6-base:upgrade` — finds and rewrites old (pre-0.3.0)
-  trait references to their new namespace across a consuming app. Dry-run
-  by default; `--apply` writes the changes. See README's "Upgrade From
-  0.2.7" section.
 - `config/coyote6-base.php` — publishable config covering every
   field/reference/method option across `machine_name`, `author`,
   `original_author`, `client`, and `slug`.
@@ -87,5 +101,6 @@ Behavioral changes beyond the namespace/class renames:
   there wasn't — so `HasClient`'s `client_id` was silently always null in
   the normal case. The method is removed; see Breaking above.
 
-[Unreleased]: https://github.com/Coyote6/laravel-base/compare/v0.3.0...master
+[Unreleased]: https://github.com/Coyote6/laravel-base/compare/v0.3.1...master
+[0.3.1]: https://github.com/Coyote6/laravel-base/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/Coyote6/laravel-base/compare/v0.2.7...v0.3.0
