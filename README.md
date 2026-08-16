@@ -63,12 +63,13 @@ Whatever;`), which keeps your alias and only swaps the underlying
 namespace. Two situations it can't safely handle automatically, and lists
 in the output instead so you can review them by hand:
 
-- **A new name would collide with something else already imported in that
-  file** — e.g. the file already has an unrelated `use App\Models\Author;`,
-  and the rename would need to introduce its own `use ...\Author;`. That
-  specific rename is skipped (everything else in the file still gets
-  rewritten normally), and the file is listed under a "collide with a
-  different, already-imported class" warning.
+- **A new name would collide with an existing, unrelated class already
+  resolvable in that file** — either because the file already has its own
+  `use App\Models\Author;`, or because the file lives in the same
+  namespace as an `Author` class and would resolve it there with no import
+  at all. That specific rename is skipped (everything else in the file
+  still gets rewritten normally), and the file is listed under a "collide
+  with an existing, unrelated class already resolvable" warning.
 - **`HasUuid` has no direct replacement** (switch to Laravel's native
   `Illuminate\Database\Eloquent\Concerns\HasUuids` — see Boot Method above
   for the behavior difference), so files referencing it are flagged in the

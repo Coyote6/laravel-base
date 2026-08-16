@@ -19,8 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for confirmation before writing, or pass `--apply` to skip the prompt and
   write immediately (e.g. in CI). A rename is skipped and listed separately
   for manual review, rather than applied blindly, when it would collide
-  with an unrelated class already imported under the same short name in a
-  file. See README's "Upgrade From 0.2.7" section.
+  with an existing, unrelated class of the same short name already
+  resolvable in a file — whether imported explicitly or just resolved via
+  a shared namespace. See README's "Upgrade From 0.2.7" section.
 - `Coyote6\LaravelBase\Upgrades\UpgradeStep` interface — the extension
   point future breaking releases use to add their own upgrade step
   alongside `Upgrade_0_3_0`, without changing `UpgradeCommand` itself.

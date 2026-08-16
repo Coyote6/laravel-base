@@ -147,10 +147,14 @@ class Upgrade_0_3_0 implements UpgradeStep {
 	// Detect Conflicts
 	//
 	// Checks $contents for renames that would introduce a bare short name
-	// already bound to a *different* class by some other import already in
-	// this file (e.g. this file already has `use App\Models\Author;`, and
-	// a plain `use Coyote6\LaravelBase\Traits\HasAuthor;` here would need
-	// to become `use Coyote6\LaravelBase\Traits\Models\Boot\Author;`).
+	// already bound to a *different* class -- either by another import
+	// already in this file (e.g. this file already has
+	// `use App\Models\Author;`, and a plain
+	// `use Coyote6\LaravelBase\Traits\HasAuthor;` here would need to become
+	// `use Coyote6\LaravelBase\Traits\Models\Boot\Author;`), or by a
+	// same-namespace class resolved with no import at all (e.g. this file
+	// and `Author` both live in `App\Models`, so `Author` already resolves
+	// there without any `use` line).
 	//
 	// @ai
 	//		Only unaliased old imports are checked. If the developer already
@@ -159,14 +163,15 @@ class Upgrade_0_3_0 implements UpgradeStep {
 	//		introduces a bare "Author" into the file's import table, so
 	//		there's nothing to collide.
 	//
-	//		Known gap: this only catches collisions against other `use`
-	//		import statements, via existingImports() below. It can't detect
-	//		a same-namespace class of the same short name resolved with no
-	//		import at all (e.g. this file and `Author` both live in
-	//		`App\Models`) -- that would need a real classmap lookup, not
-	//		just a text scan of this one file. Rare in practice since PSR-4
-	//		project layouts put one class per file/namespace, but worth
-	//		knowing this check isn't exhaustive.
+	//		The same-namespace check uses class_exists()/interface_exists()/
+	//		trait_exists()/enum_exists() against the file's own declared
+	//		namespace + the new short name, rather than another text scan --
+	//		this command runs inside the consuming app via `php artisan`, so
+	//		the app's real autoloader is already booted, and that's the only
+	//		reliable way to know whether an unimported bare name resolves to
+	//		something. Only checked when no `use` import already claims that
+	//		short name in this file, so a real collision is never reported
+	//		twice under both checks.
 	//
 	// @param $contents string - The file contents to inspect
 	// @param $renamed array - Old FQCN => new FQCN
@@ -176,6 +181,7 @@ class Upgrade_0_3_0 implements UpgradeStep {
 	protected function detectConflicts (string $contents, array $renamed): array
 	{
 		$existingImports = $this->existingImports($contents);
+		$namespace = $this->fileNamespace($contents);
 		$conflicts = [];
 
 		foreach ($renamed as $old => $new) {
@@ -189,10 +195,23 @@ class Upgrade_0_3_0 implements UpgradeStep {
 
 			$newShort = class_basename($new);
 
+			if (array_key_exists($newShort, $existingImports)) {
+				if ($existingImports[$newShort] !== $old && $existingImports[$newShort] !== $new) {
+					$conflicts[$old] = $newShort;
+				}
+
+				continue;
+			}
+
+			if ($namespace === null) {
+				continue;
+			}
+
+			$candidate = $namespace.'\\'.$newShort;
+
 			if (
-				array_key_exists($newShort, $existingImports) &&
-				$existingImports[$newShort] !== $old &&
-				$existingImports[$newShort] !== $new
+				$candidate !== $new &&
+				(class_exists($candidate) || interface_exists($candidate) || trait_exists($candidate) || enum_exists($candidate))
 			) {
 				$conflicts[$old] = $newShort;
 			}
@@ -232,6 +251,24 @@ class Upgrade_0_3_0 implements UpgradeStep {
 		}
 
 		return $imports;
+	}
+
+
+	// File Namespace
+	//
+	// Parses $contents' own `namespace X;` declaration, if any.
+	//
+	// @param $contents string - The file contents to inspect
+	//
+	// @return string|null The declared namespace, or null if the file has none
+	//
+	protected function fileNamespace (string $contents): ?string
+	{
+		if (!preg_match('/^namespace\s+([^\s;{]+)\s*;/mi', $contents, $match)) {
+			return null;
+		}
+
+		return $match[1];
 	}
 
 

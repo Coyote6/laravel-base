@@ -207,11 +207,11 @@ class UpgradeCommand extends Command {
 		}
 
 		$this->newLine();
-		$this->warn('The new trait name would collide with a different, already-imported class in these files -- left untouched, upgrade manually:');
+		$this->warn('The new trait name would collide with an existing, unrelated class already resolvable in these files -- left untouched, upgrade manually:');
 
 		foreach ($conflicts as $path => $traits) {
 			foreach ($traits as $old => $shortName) {
-				$this->line("  {$path} -- ".class_basename($old)." needs {$shortName}, but {$shortName} is already imported from elsewhere there");
+				$this->line("  {$path} -- ".class_basename($old)." needs {$shortName}, but {$shortName} already resolves to something else there");
 			}
 		}
 	}

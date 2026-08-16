@@ -221,7 +221,7 @@ it('flags a trait rename that would collide with an existing, unrelated import, 
     PHP);
 
     $this->artisan('coyote6-base:upgrade', ['--path' => $dir, '--apply' => true])
-        ->expectsOutputToContain('collide with a different, already-imported class')
+        ->expectsOutputToContain('collide with an existing, unrelated class already resolvable')
         ->expectsOutputToContain($path)
         ->assertSuccessful();
 
@@ -259,7 +259,7 @@ it('does not flag a conflict when the developer already aliased the old import',
     PHP);
 
     $this->artisan('coyote6-base:upgrade', ['--path' => $dir, '--apply' => true])
-        ->doesntExpectOutputToContain('collide with a different, already-imported class')
+        ->doesntExpectOutputToContain('collide with an existing, unrelated class already resolvable')
         ->assertSuccessful();
 
     $content = File::get($path);
@@ -269,6 +269,38 @@ it('does not flag a conflict when the developer already aliased the old import',
         ->toContain('use Coyote6\LaravelBase\Traits\Models\Boot\Author as AuthorTrait;')
         ->toContain('use App\Models\Author;')
         ->toContain('use AuthorTrait;');
+});
+
+it('flags a trait rename that would collide with a same-namespace class that has no explicit import', function () {
+    $dir = 'upgrade-command-conflict-same-namespace';
+    File::ensureDirectoryExists(base_path($dir));
+
+    $path = base_path("{$dir}/Book.php");
+    File::put($path, <<<'PHP'
+    <?php
+
+    namespace Coyote6\LaravelBase\Tests\Fixtures;
+
+    use Coyote6\LaravelBase\Traits\HasAuthor;
+    use Illuminate\Database\Eloquent\Model;
+
+    class Book extends Model
+    {
+        use HasAuthor;
+    }
+    PHP);
+
+    $this->artisan('coyote6-base:upgrade', ['--path' => $dir, '--apply' => true])
+        ->expectsOutputToContain('collide with an existing, unrelated class already resolvable')
+        ->expectsOutputToContain($path)
+        ->assertSuccessful();
+
+    $content = File::get($path);
+    File::deleteDirectory(base_path($dir));
+
+    expect($content)
+        ->toContain('use Coyote6\LaravelBase\Traits\HasAuthor;')
+        ->toContain('use HasAuthor;');
 });
 
 it('still rewrites a non-conflicting trait in the same file as a conflicting one', function () {
