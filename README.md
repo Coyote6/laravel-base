@@ -176,8 +176,10 @@ untouched.
 - `src/Traits/Models/Boot/` — Creation-helper traits that provide the `create*` hook methods `BootTraits` looks for via `method_exists()`: `Author`, `OriginalAuthor`, `Client`, `MachineName`, `MachineNameAsId`, `Slug`, and the shared internal helper `ResolvesMachineName`. Always used alongside `BootTraits` on the model, never alone.
 - `src/Traits/Database/` — Traits meant to be used on service providers, migrations, or other database-related classes: `DropsIndexes`, `ServiceProviderSeedsDb`.
 - `src/Traits/Files/` — `ReadsCsv`, for reading a CSV file into an array.
+- `src/Upgrades/` — `UpgradeStep` (the interface every upgrade step implements) and `Upgrade_0_3_0` (the v0.2.7 → v0.3.0 step) — see "Upgrade From 0.2.7" above.
+- `src/Console/Commands/UpgradeCommand.php` — the `coyote6-base:upgrade` Artisan command; runs every step registered in its own `steps()` method.
 - `src/Helpers/Helpers.php` — Global helper functions (`getCurrentUserId()`, `getCurrentUserClientId()`), autoloaded on every request via composer's `files` autoload.
-- `src/Providers/BaseServiceProvider.php` — Merges and publishes `config/coyote6-base.php`.
+- `src/Providers/BaseServiceProvider.php` — Merges/publishes `config/coyote6-base.php` and registers `coyote6-base:upgrade`.
 - `config/coyote6-base.php` — Configuration consumed by the `Boot/*` traits (see Configuration below).
 
 ## Configuration
@@ -206,7 +208,7 @@ All config lives under the `coyote6-base` key. Every `field`/`reference` option 
 
 ### Boot Method
 
-`Coyote6\LaravelBase\Traits\Models\BootTraits` — registers Eloquent model-event listeners (`creating`, `created`, `updating`, `updated`, `deleting`, `deleted`) that call a matching convention method on the model if it exists: `createAuthor`, `createOriginalAuthor`, `createClient`, `createMachineName`, `createSlug`, `createUuid` on `creating`; `modelCreating`/`modelCreated`/`modelUpdating`/`modelUpdated`/`modelDeleting`/`modelDeleted` at their respective events. A model opts into any of this just by defining the method — directly, or via one of the `Boot/*` traits below — `BootTraits` itself never requires any of them to exist.
+`Coyote6\LaravelBase\Traits\Models\BootTraits` — registers Eloquent model-event listeners (`creating`, `created`, `updating`, `updated`, `deleting`, `deleted`) that call a matching convention method on the model if it exists: `createAuthor`, `createOriginalAuthor`, `createClient`, `createMachineName`, `createSlug` on `creating`; `modelCreating`/`modelCreated`/`modelUpdating`/`modelUpdated`/`modelDeleting`/`modelDeleted` at their respective events. A model opts into any of this just by defining the method — directly, or via one of the `Boot/*` traits below — `BootTraits` itself never requires any of them to exist.
 
 For UUID primary keys, use Laravel's native `Illuminate\Database\Eloquent\Concerns\HasUuids` trait — this package no longer ships its own `Uuid` method.
 
