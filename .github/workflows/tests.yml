@@ -37,5 +37,17 @@ jobs:
           dependency-versions: ${{ matrix.dependency-version }}
           custom-cache-suffix: 2026-08-17-outage-recovery
 
+      - name: Diagnose pest cache directory
+        run: |
+          echo "--- ls -la vendor/pestphp/pest ---"
+          ls -la vendor/pestphp/pest
+          echo "--- ls -la vendor/pestphp/pest/.temp ---"
+          ls -la vendor/pestphp/pest/.temp || echo ".temp does not exist"
+          echo "--- php realpath() ---"
+          php -r "var_dump(realpath('vendor/pestphp/pest/.temp'));"
+          echo "--- whoami / id ---"
+          whoami
+          id
+
       - name: Run tests
         run: vendor/bin/pest
