@@ -35,6 +35,7 @@ jobs:
           COMPOSER_AUTH: '{"github-oauth": {"github.com": "${{ secrets.GITHUB_TOKEN }}"}}'
         with:
           dependency-versions: ${{ matrix.dependency-version }}
+          custom-cache-suffix: 2026-08-17-outage-recovery
 
       - name: Run tests
         run: vendor/bin/pest
