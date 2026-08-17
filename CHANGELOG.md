@@ -63,6 +63,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the database via Eloquent through testbench's default in-memory SQLite
   connection, which needs the PDO driver specifically, not just the raw
   `sqlite3` extension.
+- CI's `shivammathur/setup-php` step now pins `ini-values: zend.assertions=1`
+  -- its default `production` ini sets `zend.assertions=-1`, which strips
+  `assert()` calls (arguments included) at compile time. `pestphp/pest`
+  v4.7.0's own `Configuration` plugin wraps the write of its generated
+  `.pest.xml` in `assert(is_int(file_put_contents(...)))`, so under
+  `zend.assertions=-1` that file is silently never written, `realpath()`
+  on the missing path returns `false`, and Pest ends up passing PHPUnit an
+  empty `--configuration` value -- surfacing as the unrelated-looking
+  `Could not read XML from file "--cache-directory"` on every matrix leg.
+  Not a bug in this package or its CI config -- a latent `pestphp/pest`
+  v4.7.0 defect that only production-mode `zend.assertions` triggers.
 - `composer.json`'s `description` still advertised "Provides UUID trait for
   models using it as a primary key" -- stale since `HasUuid` was removed in
   the Breaking changes above.
