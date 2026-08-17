@@ -43,6 +43,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   per-file text rewrite (an environment or config check, like the
   `machine_name.method` one above).
 
+### Fixed
+
+- `composer.json`'s declared `php` floor raised from `^8.2` to `^8.3` --
+  `pestphp/pest`/`pestphp/pest-plugin-laravel` `^4.7`/`^4.1` both hard-require
+  PHP `^8.3.0`, so the CI matrix's PHP 8.2 leg was never actually
+  installable, on either `prefer-lowest` or `prefer-stable`. `^8.2` was
+  claimed but never verified by anything; `^8.3` is what CI can actually
+  confirm.
+- CI's PHP 8.2 matrix leg removed for the same reason, and a
+  `composer config -g github-oauth.github.com` step added before dependency
+  installation -- fresh `composer update` runs (no `composer.lock` is
+  committed) were hitting GitHub's anonymous API rate limit on the 8.3/8.4
+  legs, surfacing as `429`/`502` download failures unrelated to this
+  package's own dependency graph.
+- `composer.json`'s `description` still advertised "Provides UUID trait for
+  models using it as a primary key" -- stale since `HasUuid` was removed in
+  the Breaking changes above.
+
 ## [0.3.0] - 2026-08-13
 
 ### Breaking
