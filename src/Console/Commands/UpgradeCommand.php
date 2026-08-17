@@ -81,7 +81,11 @@ class UpgradeCommand extends Command {
 	// contents, then -- once any conflict has either been resolved to a
 	// developer-chosen alias (or given up on) and any flagged replacement
 	// has either been confirmed (or given up on) -- rewrite() against those
-	// same contents. Reports what it found, and applies the changes
+	// same contents. Then runs the step's additionalChecks() regardless of
+	// whether any file changed this run, since a check like "is
+	// machine_name.method still the pre-0.3.0 default" can still be
+	// relevant on a second run after the rename itself already landed.
+	// Finally reports what it found, and applies the file changes
 	// immediately if --apply was passed, otherwise only after the developer
 	// confirms. Declining, or finding nothing to do, moves on without
 	// writing anything; it never blocks a later step from running.
@@ -151,6 +155,8 @@ class UpgradeCommand extends Command {
 
 		$this->reportFlagged($remainingFlagged);
 		$this->reportConflicts($remainingConflicts);
+
+		$step->additionalChecks($this, $contentsByPath, $apply);
 
 		if ($changedFiles === []) {
 			$this->line('No file changes found.');

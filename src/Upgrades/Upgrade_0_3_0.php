@@ -3,6 +3,10 @@
 
 namespace Coyote6\LaravelBase\Upgrades;
 
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\File;
+
 
 class Upgrade_0_3_0 implements UpgradeStep {
 
@@ -67,6 +71,19 @@ class Upgrade_0_3_0 implements UpgradeStep {
 	//		it into RENAMED_TRAITS.
 	protected const INTERACTIVE_REPLACEMENTS = [
 		'Coyote6\LaravelBase\Traits\HasUuid' => 'Illuminate\Database\Eloquent\Concerns\HasUuids',
+	];
+
+	// Machine Name Methods
+	//
+	// Every value coyote6-base.machine_name.method accepts -- see
+	// ResolvesMachineName and the published config's own comments for what
+	// each one produces. Kept here (not read from the trait itself) so
+	// additionalChecks() can offer the exact same list without booting a
+	// model.
+	protected const MACHINE_NAME_METHODS = [
+		'strictKebab', 'strictSnake', 'pureKebab', 'pureSnake', 'kebab',
+		'snake', 'dot', 'slug', 'studly', 'pascal', 'camel', 'lower',
+		'upper', 'deduplicate', 'transliterate',
 	];
 
 
@@ -169,6 +186,122 @@ class Upgrade_0_3_0 implements UpgradeStep {
 		}
 
 		return $flagged;
+	}
+
+
+	// Additional Checks
+	//
+	// Reminds about the machine_name.method default change if this run's
+	// scan found any machine-name generation in use at all -- under either
+	// name, old (HasMachineName/HasMachineNameAsId) or new
+	// (BootMachineName/BootMachineNameAsId), so this still fires on a
+	// second run after the rename itself has already been applied and
+	// neither old name appears in the scanned files anymore.
+	//
+	// @param $command Command - The running console command, for prompting
+	// @param $contentsByPath array - File path => contents, from this step's scan
+	// @param $apply bool - Skip every prompt, same contract as rewrite()'s
+	//                       callers -- never publish or edit the config
+	//                       automatically, just print the same informational
+	//                       note declining to publish would show
+	//
+	// @return void
+	//
+	public function additionalChecks (Command $command, array $contentsByPath, bool $apply): void
+	{
+		foreach ($contentsByPath as $contents) {
+			if (str_contains($contents, 'MachineName')) {
+				$this->checkMachineNameMethod($command, $apply);
+
+				return;
+			}
+		}
+	}
+
+
+	// Check Machine Name Method
+	//
+	// Prior to v0.3.0, machine names were always generated snake_case-
+	// shaped; v0.3.0 changed the package default to strictKebab
+	// (dash-separated) -- see the README's "machine_name's default
+	// generation method changed" note. An app that never explicitly set
+	// machine_name.method gets the new dash-separated behavior silently, so
+	// this offers to publish the config (if not already) and update
+	// machine_name.method right in the upgrade flow, rather than leaving it
+	// to a README paragraph the developer has to go find on their own.
+	//
+	// @ai
+	//		Only a targeted regex swap of the 'method' => '...' line, not a
+	//		full parse-and-regenerate of the config file -- consistent with
+	//		this whole command's "textual rewrite, not a full PHP-aware
+	//		refactor" approach elsewhere, and specifically to avoid
+	//		destroying the config file's own per-method documentation
+	//		comments, which a var_export()-based regeneration would. Same
+	//		accepted tradeoff as everywhere else in this class: a heavily
+	//		reformatted or hand-edited config file could evade the regex.
+	//
+	// @param $command Command - The running console command, for prompting
+	// @param $apply bool - Skip every prompt and never publish/edit the config
+	//
+	// @return void
+	//
+	protected function checkMachineNameMethod (Command $command, bool $apply): void
+	{
+		$note = 'machine_name.method defaults to strictKebab as of v0.3.0 -- prior versions always generated snake_case-shaped names. Publish the config (php artisan vendor:publish --tag=coyote6-base-config) and set machine_name.method explicitly if you need to preserve the old behavior.';
+
+		if ($apply) {
+			$command->warn($note);
+			$command->line('(not prompted under --apply)');
+
+			return;
+		}
+
+		$publishedPath = config_path('coyote6-base.php');
+
+		if (!File::exists($publishedPath)) {
+			$shouldPublish = $command->confirm(
+				"This app uses machine-name generation (MachineName/MachineNameAsId), but hasn't published coyote6-base's config yet. Publish it now so machine_name.method can be reviewed?"
+			);
+
+			if (!$shouldPublish) {
+				$command->warn($note);
+
+				return;
+			}
+
+			Artisan::call('vendor:publish', ['--tag' => 'coyote6-base-config']);
+			$command->line("<info>Published</info> {$publishedPath}");
+		}
+
+		$configContents = File::get($publishedPath);
+
+		if (!preg_match("/'method'\s*=>\s*'([^']*)'/", $configContents, $match)) {
+			return;
+		}
+
+		$current = $match[1];
+		$default = in_array($current, self::MACHINE_NAME_METHODS, true) ? $current : null;
+
+		$chosen = $command->choice(
+			"machine_name.method is currently \"{$current}\". v0.3.0 changed the package default to strictKebab (dash-separated); every version before it always generated snake_case-shaped names, closest to strictSnake. Which method should this app use? (@see https://packagist.org/packages/coyote6/laravel-str and https://packagist.org/packages/coyote6/laravel-base)",
+			self::MACHINE_NAME_METHODS,
+			$default
+		);
+
+		if ($chosen === $current) {
+			return;
+		}
+
+		$updated = preg_replace(
+			"/'method'(\s*=>\s*)'[^']*'/",
+			"'method'\$1'{$chosen}'",
+			$configContents,
+			1
+		);
+
+		File::put($publishedPath, $updated);
+
+		$command->info("Updated machine_name.method to \"{$chosen}\" in {$publishedPath}.");
 	}
 
 

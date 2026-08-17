@@ -3,6 +3,8 @@
 
 namespace Coyote6\LaravelBase\Upgrades;
 
+use Illuminate\Console\Command;
+
 
 interface UpgradeStep {
 
@@ -77,6 +79,28 @@ interface UpgradeStep {
 	//               reference found
 	//
 	public function flagged (string $contents): array;
+
+
+	// Additional Checks
+	//
+	// Runs once per step, after every file's conflicts()/flagged()/
+	// rewrite() has been resolved for this run -- for whatever a step
+	// needs to check or ask about that isn't a per-file text rewrite at
+	// all (an environment setting, a config value, anything outside a
+	// scanned PHP file's own contents). Given direct access to the running
+	// command so a step can prompt/confirm/choice on its own terms. A step
+	// with nothing to check here may implement this as a no-op.
+	//
+	// @param $command Command - The running console command, for prompting
+	// @param $contentsByPath array - File path => contents, from this step's scan
+	// @param $apply bool - Never prompt when true, same "fully
+	//                       non-interactive" contract as rewrite()'s own
+	//                       callers -- a step needing this should still
+	//                       report anything relevant without asking
+	//
+	// @return void
+	//
+	public function additionalChecks (Command $command, array $contentsByPath, bool $apply): void;
 
 
 }
