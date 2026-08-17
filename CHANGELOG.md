@@ -17,11 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   v0.2.7 → v0.3.0 rename described below. Scans `app/` and `database/` by
   default (`--path` to override); reports a per-step file count and asks
   for confirmation before writing, or pass `--apply` to skip the prompt and
-  write immediately (e.g. in CI). A rename is skipped and listed separately
-  for manual review, rather than applied blindly, when it would collide
-  with an existing, unrelated class of the same short name already
-  resolvable in a file — whether imported explicitly or just resolved via
-  a shared namespace. See README's "Upgrade From 0.2.7" section.
+  write immediately (e.g. in CI). `HasAuthor`/`HasClient`/`HasMachineName`/
+  `HasMachineNameAsId` are always rewritten aliased as `BootAuthor`/
+  `BootClient`/`BootMachineName`/`BootMachineNameAsId`, since those new
+  short names are generic enough to routinely collide with a real domain
+  class. If even that alias collides with an existing, unrelated class of
+  the same short name already resolvable in a file — whether imported
+  explicitly or just resolved via a shared namespace — the command asks
+  once per distinct collision for a different alias to use instead, or
+  skips and lists the file for manual review if left blank (never prompted
+  under `--apply`). See README's "Upgrade From 0.2.7" section.
 - `Coyote6\LaravelBase\Upgrades\UpgradeStep` interface — the extension
   point future breaking releases use to add their own upgrade step
   alongside `Upgrade_0_3_0`, without changing `UpgradeCommand` itself.

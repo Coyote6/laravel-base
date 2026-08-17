@@ -76,15 +76,18 @@ class UpgradeCommand extends Command {
 
 	// Run Step
 	//
-	// Scans every .php file under $directories for one upgrade step,
-	// reports what it found, and applies the changes -- immediately if
-	// --apply was passed, otherwise only after the developer confirms.
+	// Scans every .php file under $directories for one upgrade step in two
+	// passes: first conflicts()/flagged() against every file's current
+	// contents, then -- once any conflict has either been resolved to a
+	// developer-chosen alias or given up on -- rewrite() against those same
+	// contents. Reports what it found, and applies the changes immediately
+	// if --apply was passed, otherwise only after the developer confirms.
 	// Declining, or finding nothing to do, moves on without writing
 	// anything; it never blocks a later step from running.
 	//
 	// @param $step UpgradeStep
 	// @param $directories array - Absolute paths already confirmed to exist
-	// @param $apply bool - Skip the confirmation prompt and write immediately
+	// @param $apply bool - Skip every prompt (confirmation and alias) and write immediately
 	//
 	// @return void
 	//
@@ -93,38 +96,50 @@ class UpgradeCommand extends Command {
 		$this->newLine();
 		$this->info("Running v{$step->version()} upgrades");
 
-		$changedFiles = [];
-		$conflicts = [];
+		$contentsByPath = [];
+
+		foreach ($this->phpFiles($directories) as $path) {
+			$contentsByPath[$path] = File::get($path);
+		}
+
+		$conflictsByPath = [];
 		$flagged = [];
 
-		foreach ($directories as $fullPath) {
-			foreach (File::allFiles($fullPath) as $file) {
-				if ($file->getExtension() !== 'php') {
-					continue;
-				}
+		foreach ($contentsByPath as $path => $original) {
+			$fileConflicts = $step->conflicts($original);
+			if ($fileConflicts !== []) {
+				$conflictsByPath[$path] = $fileConflicts;
+			}
 
-				$original = File::get($file->getPathname());
+			$fileFlagged = $step->flagged($original);
+			if ($fileFlagged !== []) {
+				$flagged[$path] = $fileFlagged;
+			}
+		}
 
-				$fileConflicts = $step->conflicts($original);
-				if ($fileConflicts !== []) {
-					$conflicts[$file->getPathname()] = $fileConflicts;
-				}
+		$aliases = $this->resolveConflictAliases($conflictsByPath, $apply);
 
-				$fileFlagged = $step->flagged($original);
-				if ($fileFlagged !== []) {
-					$flagged[$file->getPathname()] = $fileFlagged;
-				}
+		$changedFiles = [];
+		$remainingConflicts = [];
 
-				$updated = $step->rewrite($original);
+		foreach ($contentsByPath as $path => $original) {
+			$updated = $step->rewrite($original, $aliases);
 
-				if ($updated !== $original) {
-					$changedFiles[$file->getPathname()] = $updated;
+			if ($updated !== $original) {
+				$changedFiles[$path] = $updated;
+			}
+
+			if (isset($conflictsByPath[$path])) {
+				$stillConflicting = array_diff_key($conflictsByPath[$path], $aliases);
+
+				if ($stillConflicting !== []) {
+					$remainingConflicts[$path] = $stillConflicting;
 				}
 			}
 		}
 
 		$this->reportFlagged($flagged);
-		$this->reportConflicts($conflicts);
+		$this->reportConflicts($remainingConflicts);
 
 		if ($changedFiles === []) {
 			$this->line('No file changes found.');
@@ -149,6 +164,81 @@ class UpgradeCommand extends Command {
 		}
 
 		$this->info("Updated {$count} {$label}.");
+	}
+
+
+	// Php Files
+	//
+	// @param $directories array - Absolute paths already confirmed to exist
+	//
+	// @return array<string> Absolute paths of every .php file found
+	//
+	protected function phpFiles (array $directories): array
+	{
+		$paths = [];
+
+		foreach ($directories as $fullPath) {
+			foreach (File::allFiles($fullPath) as $file) {
+				if ($file->getExtension() === 'php') {
+					$paths[] = $file->getPathname();
+				}
+			}
+		}
+
+		return $paths;
+	}
+
+
+	// Resolve Conflict Aliases
+	//
+	// Asks the developer once per distinct old-FQCN conflict found across
+	// every file scanned this step -- not once per file, since the same
+	// trait/short-name collision typically repeats across many files (e.g.
+	// every model using the Client trait, in an app with its own Client
+	// model) and re-asking the same question per file would be tedious for
+	// no benefit; one alias is applied everywhere that trait conflicts.
+	// Never prompts when $apply is set, since --apply means fully
+	// non-interactive (e.g. CI) -- conflicts just stay unresolved and get
+	// reported for manual review, same as declining here would.
+	//
+	// @param $conflictsByPath array - File path => [old FQCN => colliding short name, ...]
+	// @param $apply bool - Skip prompting entirely
+	//
+	// @return array Old FQCN => developer-chosen alias, only for conflicts
+	//               actually given a non-blank answer
+	//
+	protected function resolveConflictAliases (array $conflictsByPath, bool $apply): array
+	{
+		$distinct = [];
+		$fileCounts = [];
+
+		foreach ($conflictsByPath as $traits) {
+			foreach ($traits as $old => $shortName) {
+				$distinct[$old] = $shortName;
+				$fileCounts[$old] = ($fileCounts[$old] ?? 0) + 1;
+			}
+		}
+
+		if ($distinct === [] || $apply) {
+			return [];
+		}
+
+		$aliases = [];
+
+		foreach ($distinct as $old => $shortName) {
+			$count = $fileCounts[$old];
+			$label = Str::plural('file', $count);
+
+			$answer = $this->ask(
+				"Even aliased as {$shortName}, ".class_basename($old)."'s replacement still collides with an existing class in {$count} {$label}. Enter a different alias to use instead, or leave blank to skip and review manually"
+			);
+
+			if (is_string($answer) && trim($answer) !== '') {
+				$aliases[$old] = trim($answer);
+			}
+		}
+
+		return $aliases;
 	}
 
 

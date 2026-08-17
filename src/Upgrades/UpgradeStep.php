@@ -26,10 +26,16 @@ interface UpgradeStep {
 	// which steps already ran against a given application.
 	//
 	// @param $contents string - The file contents to rewrite
+	// @param $customAliases array - Old FQCN => developer-chosen alias, for
+	//                                changes conflicts() reported that the
+	//                                developer resolved interactively (see
+	//                                UpgradeCommand::resolveConflictAliases()).
+	//                                A step with nothing needing this may
+	//                                ignore the parameter entirely.
 	//
 	// @return string
 	//
-	public function rewrite (string $contents): string;
+	public function rewrite (string $contents, array $customAliases = []): string;
 
 
 	// Conflicts
@@ -37,12 +43,13 @@ interface UpgradeStep {
 	// Checks $contents for changes this step would normally apply that
 	// instead need manual attention -- e.g. a name this step would
 	// introduce is already bound to something unrelated in this file.
-	// Anything reported here must NOT also be applied by rewrite().
+	// Anything reported here must NOT also be applied by rewrite() unless
+	// resolved via $customAliases.
 	//
 	// @param $contents string - The file contents to inspect
 	//
-	// @return array Old FQCN => description of what's blocking it, one
-	//               entry per conflict found
+	// @return array Old FQCN => colliding short name, one entry per
+	//               conflict found
 	//
 	public function conflicts (string $contents): array;
 

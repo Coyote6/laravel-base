@@ -31,8 +31,8 @@ it('is a dry-run by default -- declining the confirmation leaves the file untouc
     File::deleteDirectory(base_path($dir));
 
     expect($updated)
-        ->toContain('use Coyote6\LaravelBase\Traits\Models\Boot\Author;')
-        ->toContain('use Author;')
+        ->toContain('use Coyote6\LaravelBase\Traits\Models\Boot\Author as BootAuthor;')
+        ->toContain('use BootAuthor;')
         ->not->toContain('HasAuthor');
 });
 
@@ -60,7 +60,7 @@ it('applies changes when the developer confirms, without needing --apply', funct
     File::deleteDirectory(base_path($dir));
 
     expect($updated)
-        ->toContain('use Author;')
+        ->toContain('use BootAuthor;')
         ->not->toContain('HasAuthor');
 });
 
@@ -146,12 +146,12 @@ it('rewrites both the FQCN import and the bare use-statement for every renamed t
     File::deleteDirectory(base_path($dir));
 
     expect($updated)
-        ->toContain('use Coyote6\LaravelBase\Traits\Models\Boot\Author;')
-        ->toContain('use Coyote6\LaravelBase\Traits\Models\Boot\Client;')
-        ->toContain('use Coyote6\LaravelBase\Traits\Models\Boot\MachineName;')
-        ->toContain('use Coyote6\LaravelBase\Traits\Models\Boot\MachineNameAsId;')
+        ->toContain('use Coyote6\LaravelBase\Traits\Models\Boot\Author as BootAuthor;')
+        ->toContain('use Coyote6\LaravelBase\Traits\Models\Boot\Client as BootClient;')
+        ->toContain('use Coyote6\LaravelBase\Traits\Models\Boot\MachineName as BootMachineName;')
+        ->toContain('use Coyote6\LaravelBase\Traits\Models\Boot\MachineNameAsId as BootMachineNameAsId;')
         ->toContain('use Coyote6\LaravelBase\Traits\Models\BootTraits;')
-        ->toContain('use Author, Client, MachineName, MachineNameAsId, BootTraits;')
+        ->toContain('use BootAuthor, BootClient, BootMachineName, BootMachineNameAsId, BootTraits;')
         ->not->toContain('HasAuthor')
         ->not->toContain('HasClient')
         // Only check the exact old identifiers, not "MachineName"/"MachineNameAsId"
@@ -195,8 +195,8 @@ it('skips a missing directory with a warning instead of failing', function () {
         ->assertSuccessful();
 });
 
-it('flags a trait rename that would collide with an existing, unrelated import, and leaves it untouched', function () {
-    $dir = 'upgrade-command-conflict';
+it('does not flag a conflict when a real Author model exists, since the mandatory BootAuthor alias avoids it', function () {
+    $dir = 'upgrade-command-no-conflict-with-mandatory-alias';
     File::ensureDirectoryExists(base_path($dir));
 
     $path = base_path("{$dir}/Book.php");
@@ -221,6 +221,49 @@ it('flags a trait rename that would collide with an existing, unrelated import, 
     PHP);
 
     $this->artisan('coyote6-base:upgrade', ['--path' => $dir, '--apply' => true])
+        ->doesntExpectOutputToContain('collides with an existing class')
+        ->assertSuccessful();
+
+    $content = File::get($path);
+    File::deleteDirectory(base_path($dir));
+
+    expect($content)
+        ->toContain('use Coyote6\LaravelBase\Traits\Models\Boot\Author as BootAuthor;')
+        ->toContain('use App\Models\Author;')
+        ->toContain('use BootAuthor;')
+        ->not->toContain('HasAuthor');
+});
+
+it('prompts for a custom alias when even the mandatory BootAuthor alias collides, and leaves the file untouched when declined', function () {
+    $dir = 'upgrade-command-conflict';
+    File::ensureDirectoryExists(base_path($dir));
+
+    $path = base_path("{$dir}/Book.php");
+    File::put($path, <<<'PHP'
+    <?php
+
+    namespace App\Models;
+
+    use App\Models\BootAuthor;
+    use Coyote6\LaravelBase\Traits\HasAuthor;
+    use Illuminate\Database\Eloquent\Model;
+
+    class Book extends Model
+    {
+        use HasAuthor;
+
+        public function author()
+        {
+            return $this->belongsTo(BootAuthor::class);
+        }
+    }
+    PHP);
+
+    $this->artisan('coyote6-base:upgrade', ['--path' => $dir])
+        ->expectsQuestion(
+            "Even aliased as BootAuthor, HasAuthor's replacement still collides with an existing class in 1 file. Enter a different alias to use instead, or leave blank to skip and review manually",
+            ''
+        )
         ->expectsOutputToContain('collide with an existing, unrelated class already resolvable')
         ->expectsOutputToContain($path)
         ->assertSuccessful();
@@ -233,6 +276,86 @@ it('flags a trait rename that would collide with an existing, unrelated import, 
         ->toContain('use HasAuthor;');
 });
 
+it('applies a developer-chosen alias when even the mandatory BootAuthor alias collides', function () {
+    $dir = 'upgrade-command-conflict-custom-alias';
+    File::ensureDirectoryExists(base_path($dir));
+
+    $path = base_path("{$dir}/Book.php");
+    File::put($path, <<<'PHP'
+    <?php
+
+    namespace App\Models;
+
+    use App\Models\BootAuthor;
+    use Coyote6\LaravelBase\Traits\HasAuthor;
+    use Illuminate\Database\Eloquent\Model;
+
+    class Book extends Model
+    {
+        use HasAuthor;
+
+        public function author()
+        {
+            return $this->belongsTo(BootAuthor::class);
+        }
+    }
+    PHP);
+
+    $this->artisan('coyote6-base:upgrade', ['--path' => $dir])
+        ->expectsQuestion(
+            "Even aliased as BootAuthor, HasAuthor's replacement still collides with an existing class in 1 file. Enter a different alias to use instead, or leave blank to skip and review manually",
+            'AuthorStamp'
+        )
+        ->expectsConfirmation('Found 1 file that would change. Apply the changes?', 'yes')
+        ->assertSuccessful();
+
+    $content = File::get($path);
+    File::deleteDirectory(base_path($dir));
+
+    expect($content)
+        ->toContain('use Coyote6\LaravelBase\Traits\Models\Boot\Author as AuthorStamp;')
+        ->toContain('use App\Models\BootAuthor;')
+        ->toContain('use AuthorStamp;')
+        ->not->toContain('HasAuthor');
+});
+
+it('never prompts for an alias under --apply, leaving a double collision unresolved instead', function () {
+    $dir = 'upgrade-command-conflict-apply-no-prompt';
+    File::ensureDirectoryExists(base_path($dir));
+
+    $path = base_path("{$dir}/Book.php");
+    File::put($path, <<<'PHP'
+    <?php
+
+    namespace App\Models;
+
+    use App\Models\BootAuthor;
+    use Coyote6\LaravelBase\Traits\HasAuthor;
+    use Illuminate\Database\Eloquent\Model;
+
+    class Book extends Model
+    {
+        use HasAuthor;
+
+        public function author()
+        {
+            return $this->belongsTo(BootAuthor::class);
+        }
+    }
+    PHP);
+
+    // No expectsQuestion() stub at all -- if the command tried to prompt under
+    // --apply, Mockery would throw for an unexpected askQuestion() call.
+    $this->artisan('coyote6-base:upgrade', ['--path' => $dir, '--apply' => true])
+        ->expectsOutputToContain('collide with an existing, unrelated class already resolvable')
+        ->assertSuccessful();
+
+    $content = File::get($path);
+    File::deleteDirectory(base_path($dir));
+
+    expect($content)->toContain('use Coyote6\LaravelBase\Traits\HasAuthor;');
+});
+
 it('does not flag a conflict when the developer already aliased the old import', function () {
     $dir = 'upgrade-command-conflict-aliased';
     File::ensureDirectoryExists(base_path($dir));
@@ -243,7 +366,7 @@ it('does not flag a conflict when the developer already aliased the old import',
 
     namespace App\Models;
 
-    use App\Models\Author;
+    use App\Models\BootAuthor;
     use Coyote6\LaravelBase\Traits\HasAuthor as AuthorTrait;
     use Illuminate\Database\Eloquent\Model;
 
@@ -253,7 +376,7 @@ it('does not flag a conflict when the developer already aliased the old import',
 
         public function author()
         {
-            return $this->belongsTo(Author::class);
+            return $this->belongsTo(BootAuthor::class);
         }
     }
     PHP);
@@ -267,7 +390,7 @@ it('does not flag a conflict when the developer already aliased the old import',
 
     expect($content)
         ->toContain('use Coyote6\LaravelBase\Traits\Models\Boot\Author as AuthorTrait;')
-        ->toContain('use App\Models\Author;')
+        ->toContain('use App\Models\BootAuthor;')
         ->toContain('use AuthorTrait;');
 });
 
@@ -290,7 +413,11 @@ it('flags a trait rename that would collide with a same-namespace class that has
     }
     PHP);
 
-    $this->artisan('coyote6-base:upgrade', ['--path' => $dir, '--apply' => true])
+    $this->artisan('coyote6-base:upgrade', ['--path' => $dir])
+        ->expectsQuestion(
+            "Even aliased as BootAuthor, HasAuthor's replacement still collides with an existing class in 1 file. Enter a different alias to use instead, or leave blank to skip and review manually",
+            ''
+        )
         ->expectsOutputToContain('collide with an existing, unrelated class already resolvable')
         ->expectsOutputToContain($path)
         ->assertSuccessful();
@@ -313,7 +440,7 @@ it('still rewrites a non-conflicting trait in the same file as a conflicting one
 
     namespace App\Models;
 
-    use App\Models\Author;
+    use App\Models\BootAuthor;
     use Coyote6\LaravelBase\Traits\HasAuthor;
     use Coyote6\LaravelBase\Traits\HasClient;
     use Illuminate\Database\Eloquent\Model;
@@ -324,18 +451,69 @@ it('still rewrites a non-conflicting trait in the same file as a conflicting one
 
         public function author()
         {
-            return $this->belongsTo(Author::class);
+            return $this->belongsTo(BootAuthor::class);
         }
     }
     PHP);
 
-    $this->artisan('coyote6-base:upgrade', ['--path' => $dir, '--apply' => true])->assertSuccessful();
+    $this->artisan('coyote6-base:upgrade', ['--path' => $dir])
+        ->expectsQuestion(
+            "Even aliased as BootAuthor, HasAuthor's replacement still collides with an existing class in 1 file. Enter a different alias to use instead, or leave blank to skip and review manually",
+            ''
+        )
+        ->expectsConfirmation('Found 1 file that would change. Apply the changes?', 'yes')
+        ->assertSuccessful();
 
     $content = File::get($path);
     File::deleteDirectory(base_path($dir));
 
     expect($content)
         ->toContain('use Coyote6\LaravelBase\Traits\HasAuthor;')
-        ->toContain('use Coyote6\LaravelBase\Traits\Models\Boot\Client;')
+        ->toContain('use Coyote6\LaravelBase\Traits\Models\Boot\Client as BootClient;')
         ->not->toContain('HasClient');
+});
+
+it('asks once per distinct trait collision even when many files share it', function () {
+    $dir = 'upgrade-command-conflict-dedup';
+    File::ensureDirectoryExists(base_path($dir));
+
+    foreach (['One', 'Two', 'Three'] as $name) {
+        File::put(base_path("{$dir}/{$name}.php"), <<<PHP
+        <?php
+
+        namespace App\Models;
+
+        use App\Models\BootAuthor;
+        use Coyote6\LaravelBase\Traits\HasAuthor;
+        use Illuminate\Database\Eloquent\Model;
+
+        class {$name} extends Model
+        {
+            use HasAuthor;
+
+            public function author()
+            {
+                return \$this->belongsTo(BootAuthor::class);
+            }
+        }
+        PHP);
+    }
+
+    $this->artisan('coyote6-base:upgrade', ['--path' => $dir])
+        ->expectsQuestion(
+            "Even aliased as BootAuthor, HasAuthor's replacement still collides with an existing class in 3 files. Enter a different alias to use instead, or leave blank to skip and review manually",
+            'AuthorStamp'
+        )
+        ->expectsConfirmation('Found 3 files that would change. Apply the changes?', 'yes')
+        ->assertSuccessful();
+
+    foreach (['One', 'Two', 'Three'] as $name) {
+        $content = File::get(base_path("{$dir}/{$name}.php"));
+
+        expect($content)
+            ->toContain('use Coyote6\LaravelBase\Traits\Models\Boot\Author as AuthorStamp;')
+            ->toContain('use AuthorStamp;');
+    }
+
+    File::deleteDirectory(base_path($dir));
 });

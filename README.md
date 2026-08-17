@@ -24,6 +24,16 @@ new-namespace table — every trait moved, and four were renamed
 `Author`/`Client`/`MachineName`/`MachineNameAsId`). There's no deprecation
 shim; it's a hard cutover.
 
+Those four new names are short and generic enough to routinely collide with
+a real domain class already living in an app being upgraded — `Client` and
+`Author` are common model names. So the upgrade command below always
+imports them aliased (`BootAuthor`/`BootClient`/`BootMachineName`/
+`BootMachineNameAsId`) rather than bare, regardless of whether this
+particular file happens to collide today. This is specific to the automated
+upgrade path; a fresh install has no such history to protect against, so
+Creation Helpers below documents the plain, unaliased names as the default —
+alias by hand only if your own app also has a class by the same name.
+
 **Automating the namespace rename.** This package ships a command that scans
 your application and rewrites old trait references to whatever the current
 version needs:
@@ -60,16 +70,35 @@ It rewrites both the `use` import statement and the bare `use ShortName;`
 trait-inclusion line inside a class body, for every renamed/moved trait —
 including an aliased import (`use Coyote6\LaravelBase\Traits\HasAuthor as
 Whatever;`), which keeps your alias and only swaps the underlying
-namespace. Two situations it can't safely handle automatically, and lists
-in the output instead so you can review them by hand:
+namespace. `HasAuthor`/`HasClient`/`HasMachineName`/`HasMachineNameAsId`
+are always rewritten aliased as `BootAuthor`/`BootClient`/
+`BootMachineName`/`BootMachineNameAsId`, per the naming note above, even in
+files where the bare name wouldn't currently collide with anything — so
+the same trait always reads the same way everywhere in your codebase, and
+you never have to wonder why one file says `Client` and another says
+`BootClient`.
 
-- **A new name would collide with an existing, unrelated class already
-  resolvable in that file** — either because the file already has its own
-  `use App\Models\Author;`, or because the file lives in the same
-  namespace as an `Author` class and would resolve it there with no import
-  at all. That specific rename is skipped (everything else in the file
-  still gets rewritten normally), and the file is listed under a "collide
-  with an existing, unrelated class already resolvable" warning.
+Two situations it can't safely handle automatically:
+
+- **Even the `Boot*` alias collides with an existing, unrelated class
+  already resolvable in that file** — either because the file already has
+  its own `use App\Models\BootClient;`, or because the file lives in the
+  same namespace as a `BootClient` class and would resolve it there with
+  no import at all. When this happens, the command asks once per distinct
+  trait/collision (not once per file — the same collision typically
+  repeats across every model using that trait):
+
+  ```
+  Even aliased as BootClient, HasClient's replacement still collides with an existing class in 4 files. Enter a different alias to use instead, or leave blank to skip and review manually:
+  ```
+
+  Answer with a different alias to apply it everywhere that collision
+  occurs, or leave it blank to skip those files and list them under a
+  "collide with an existing, unrelated class already resolvable" warning
+  instead — everything else in an affected file still gets rewritten
+  normally. This prompt is never asked under `--apply`; a still-conflicting
+  rename is left untouched and reported instead, same as declining would
+  do interactively.
 - **`HasUuid` has no direct replacement** (switch to Laravel's native
   `Illuminate\Database\Eloquent\Concerns\HasUuids` — see Boot Method above
   for the behavior difference), so files referencing it are flagged in the
@@ -80,15 +109,16 @@ straightforward textual rewrite, not a full PHP-aware refactor, so give it
 a look rather than trusting it blindly on generated or unusually formatted
 code.
 
-**If your database columns don't match the new defaults.** `Author`,
-`Client`, `MachineName`, `MachineNameAsId`, and `Slug` used to hardcode which
-attribute they read from/wrote to (`author_id`, `client_id`, `machine_name`,
-`name`). Those are now config-driven (`field`/`reference` under each
-section — see Configuration below), and the defaults match the old hardcoded
-names exactly, so most upgrades need no config changes at all. If any of
-your tables already used different column names for these before upgrading,
-publish the config and point `field`/`reference` at your existing columns
-instead of renaming the database:
+**If your database columns don't match the new defaults.** `BootAuthor`,
+`BootClient`, `BootMachineName`, `BootMachineNameAsId`, and `Slug` used
+to hardcode which attribute they read from/wrote to (`author_id`,
+`client_id`, `machine_name`, `name`). Those are now config-driven
+(`field`/`reference` under each section — see Configuration below), and the
+defaults match the old hardcoded names exactly, so most upgrades need no
+config changes at all. If any of your tables already used different column
+names for these before upgrading, publish the config and point
+`field`/`reference` at your existing columns instead of renaming the
+database:
 
 ```php
 // config/coyote6-base.php
@@ -98,7 +128,7 @@ instead of renaming the database:
 ```
 
 **`machine_name`'s default generation method changed.** Before v0.3.0,
-`MachineName`/`MachineNameAsId` always lowercased and replaced every
+`BootMachineName`/`BootMachineNameAsId` always lowercased and replaced every
 non-alphanumeric character with an underscore — snake_case-shaped output.
 The new default is `strictKebab` (dash-separated), since that's now the
 package-wide default `machine_name.method`. If your existing `machine_name`
@@ -159,6 +189,11 @@ All under `Coyote6\LaravelBase\Traits\Models\Boot`:
 - **`MachineNameAsId`** — same as `MachineName`, but writes to the model's primary key instead of a separate field. Use one or the other, never both — they share the `createMachineName` method name and will fatal on a trait collision if combined.
 - **`Slug`** — sets `slug.field` (default `slug`) from `slug.reference` (default `name`) via `Str::slug()`, using `slug.separator`/`slug.language`/`slug.dictionary`.
 - **`ResolvesMachineName`** — internal; composed by `MachineName` and `MachineNameAsId`, not meant to be `use`d directly on a model. Provides `resolveMachineName()` and `resolveMachineNameReference()`.
+
+If your app already has its own `Author`/`Client`/etc. class and needs both,
+alias the import (`use ...\Boot\Client as BootClient;`) — see "Upgrade From
+0.2.7" above for why the automated upgrade command always does this by
+default.
 
 ### Select Dropdown/Radio Button Helpers
 

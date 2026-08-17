@@ -25,6 +25,25 @@ class Upgrade_0_3_0 implements UpgradeStep {
 		'Coyote6\LaravelBase\Traits\ReadsCsv' => 'Coyote6\LaravelBase\Traits\Files\ReadsCsv',
 	];
 
+	// Mandatory Aliases
+	//
+	// Old FQCN => alias always used in place of the new trait's own bare
+	// short name, for renames whose new short name is generic enough to
+	// routinely collide with a real domain class -- Client and Author are
+	// both confirmed live model names across every app in this ecosystem,
+	// and MachineName/MachineNameAsId are the same shape of risk even
+	// though nothing collides with them today. Always written aliased
+	// (`use ...\Client as BootClient;`), regardless of whether this
+	// specific file happens to collide, so the tool never has to guess
+	// file-by-file and a developer reading the code always sees the same
+	// name for the same trait everywhere.
+	protected const MANDATORY_ALIASES = [
+		'Coyote6\LaravelBase\Traits\HasAuthor' => 'BootAuthor',
+		'Coyote6\LaravelBase\Traits\HasClient' => 'BootClient',
+		'Coyote6\LaravelBase\Traits\HasMachineName' => 'BootMachineName',
+		'Coyote6\LaravelBase\Traits\HasMachineNameAsId' => 'BootMachineNameAsId',
+	];
+
 	// Interactive Replacements
 	//
 	// Old fully-qualified trait name => new fully-qualified trait name, for
@@ -60,30 +79,41 @@ class Upgrade_0_3_0 implements UpgradeStep {
 	// Rewrite
 	//
 	// Applies every non-conflicting renamed-trait substitution to
-	// $contents: the fully-qualified name wherever it appears, plus the
-	// bare short class name (word-boundary-safe) to catch `use ShortName;`
-	// trait inclusions left pointing at the old name once its import line
-	// changes.
+	// $contents: the fully-qualified name wherever it appears, aliased to
+	// its MANDATORY_ALIASES entry when it has one (otherwise its own bare
+	// short name), plus the bare short class name (word-boundary-safe) to
+	// catch `use ShortName;` trait inclusions left pointing at the old name
+	// once its import line changes.
 	//
 	// @param $contents string - The file contents to rewrite
+	// @param $customAliases array - Old FQCN => developer-chosen alias, for
+	//                                renames still conflicting even under
+	//                                their MANDATORY_ALIASES entry (see
+	//                                UpgradeCommand::resolveConflictAliases())
 	//
 	// @return string
 	//
-	public function rewrite (string $contents): string
+	public function rewrite (string $contents, array $customAliases = []): string
 	{
 		$renamed = $this->sortedRenames();
 		$conflicts = $this->detectConflicts($contents, $renamed);
-		$applicable = $conflicts === [] ? $renamed : array_diff_key($renamed, $conflicts);
 
-		foreach ($applicable as $old => $new) {
-			$contents = str_replace($old, $new, $contents);
-
-			$oldShort = class_basename($old);
-			$newShort = class_basename($new);
-
-			if ($oldShort !== $newShort) {
-				$contents = preg_replace('/\b'.preg_quote($oldShort, '/').'\b/', $newShort, $contents);
+		foreach ($renamed as $old => $new) {
+			if (!str_contains($contents, $old)) {
+				continue;
 			}
+
+			if (array_key_exists($old, $conflicts)) {
+				if (!isset($customAliases[$old]) || $customAliases[$old] === '') {
+					continue;
+				}
+
+				$contents = $this->applyRename($contents, $old, $new, $customAliases[$old]);
+
+				continue;
+			}
+
+			$contents = $this->applyRename($contents, $old, $new, self::MANDATORY_ALIASES[$old] ?? class_basename($new));
 		}
 
 		return $contents;
@@ -94,7 +124,9 @@ class Upgrade_0_3_0 implements UpgradeStep {
 	//
 	// @param $contents string - The file contents to inspect
 	//
-	// @return array Old FQCN => colliding new short name
+	// @return array Old FQCN => colliding target short name (the
+	//               MANDATORY_ALIASES entry when the rename has one,
+	//               otherwise the new trait's own bare short name)
 	//
 	public function conflicts (string $contents): array
 	{
@@ -122,6 +154,49 @@ class Upgrade_0_3_0 implements UpgradeStep {
 	}
 
 
+	// Apply Rename
+	//
+	// Swaps $old's FQCN for $new wherever it appears in $contents, aliases
+	// the resulting `use $new;` import line to $useAs if that differs from
+	// $new's own bare short name, and swaps every bare occurrence of
+	// $old's short name (e.g. the class-body `use OldShortName;`
+	// trait-inclusion) to $useAs.
+	//
+	// @param $contents string - The file contents to rewrite
+	// @param $old string - Old FQCN
+	// @param $new string - New FQCN
+	// @param $useAs string - The short name this rename should end up
+	//                        using everywhere in $contents -- $new's own
+	//                        bare short name, its MANDATORY_ALIASES entry,
+	//                        or a developer-chosen custom alias
+	//
+	// @return string
+	//
+	protected function applyRename (string $contents, string $old, string $new, string $useAs): string
+	{
+		$contents = str_replace($old, $new, $contents);
+
+		$newShort = class_basename($new);
+
+		if ($newShort !== $useAs) {
+			$contents = preg_replace(
+				'/^(use\s+'.preg_quote($new, '/').')\s*;/mi',
+				'$1 as '.$useAs.';',
+				$contents,
+				1
+			);
+		}
+
+		$oldShort = class_basename($old);
+
+		if ($oldShort !== $useAs) {
+			$contents = preg_replace('/\b'.preg_quote($oldShort, '/').'\b/', $useAs, $contents);
+		}
+
+		return $contents;
+	}
+
+
 	// Sorted Renames
 	//
 	// RENAMED_TRAITS sorted by key length descending before use, as a
@@ -146,37 +221,53 @@ class Upgrade_0_3_0 implements UpgradeStep {
 
 	// Detect Conflicts
 	//
-	// Checks $contents for renames that would introduce a bare short name
-	// already bound to a *different* class -- either by another import
-	// already in this file (e.g. this file already has
-	// `use App\Models\Author;`, and a plain
-	// `use Coyote6\LaravelBase\Traits\HasAuthor;` here would need to become
-	// `use Coyote6\LaravelBase\Traits\Models\Boot\Author;`), or by a
+	// Checks $contents for renames that would introduce a target short name
+	// (the MANDATORY_ALIASES entry when the rename has one, otherwise the
+	// new trait's own bare short name) already bound to a *different*
+	// class -- either by another import already in this file (e.g. this
+	// file already has `use App\Models\BootClient;` for some unrelated
+	// reason, and the Client rename would need that same alias), or by a
 	// same-namespace class resolved with no import at all (e.g. this file
-	// and `Author` both live in `App\Models`, so `Author` already resolves
-	// there without any `use` line).
+	// and `BootClient` both live in `App\Models`).
 	//
 	// @ai
 	//		Only unaliased old imports are checked. If the developer already
 	//		wrote `use Coyote6\LaravelBase\Traits\HasAuthor as Whatever;`,
-	//		rewrite() preserves that alias verbatim -- the new FQCN never
-	//		introduces a bare "Author" into the file's import table, so
-	//		there's nothing to collide.
+	//		applyRename() preserves that alias verbatim -- the new FQCN
+	//		never introduces a bare "Author"/"BootAuthor" into the file's
+	//		import table, so there's nothing to collide.
 	//
 	//		The same-namespace check uses class_exists()/interface_exists()/
 	//		trait_exists()/enum_exists() against the file's own declared
-	//		namespace + the new short name, rather than another text scan --
-	//		this command runs inside the consuming app via `php artisan`, so
-	//		the app's real autoloader is already booted, and that's the only
-	//		reliable way to know whether an unimported bare name resolves to
-	//		something. Only checked when no `use` import already claims that
-	//		short name in this file, so a real collision is never reported
-	//		twice under both checks.
+	//		namespace + the target short name, rather than another text
+	//		scan -- this command runs inside the consuming app via
+	//		`php artisan`, so the app's real autoloader is already booted,
+	//		and that's the only reliable way to know whether an unimported
+	//		bare name resolves to something. Only checked when no `use`
+	//		import already claims that short name in this file, so a real
+	//		collision is never reported twice under both checks.
+	//
+	//		This loop runs over every entry in RENAMED_TRAITS, not just the
+	//		4 with a MANDATORY_ALIASES entry -- but in practice only those 4
+	//		(Author, Client, MachineName, MachineNameAsId) can ever actually
+	//		trigger a conflict, because they're the only renames whose bare
+	//		short name changes. The other 7 (BootTraits, GetAsOptions,
+	//		GetAsOptionsAbbr, GetBySlug, DropsIndexes,
+	//		ServiceProviderSeedsDb, ReadsCsv) keep the exact same short name
+	//		across the rename -- only their namespace/directory moves -- so
+	//		either the old import already legitimately claims that bare slot
+	//		in this file (existingImports()'s own `!== $old` guard already
+	//		excludes that), or the trait is referenced only via a
+	//		fully-qualified name with no `use` import at all, in which case
+	//		applyRename() only swaps that FQCN text in place and never
+	//		introduces a new bare import to begin with. There's no starting
+	//		file, valid as PHP, where renaming one of those 7 introduces a
+	//		collision that didn't already exist before this tool touched it.
 	//
 	// @param $contents string - The file contents to inspect
 	// @param $renamed array - Old FQCN => new FQCN
 	//
-	// @return array Old FQCN => colliding new short name, for every conflict found
+	// @return array Old FQCN => colliding target short name, for every conflict found
 	//
 	protected function detectConflicts (string $contents, array $renamed): array
 	{
@@ -193,11 +284,11 @@ class Upgrade_0_3_0 implements UpgradeStep {
 				continue;
 			}
 
-			$newShort = class_basename($new);
+			$targetShort = self::MANDATORY_ALIASES[$old] ?? class_basename($new);
 
-			if (array_key_exists($newShort, $existingImports)) {
-				if ($existingImports[$newShort] !== $old && $existingImports[$newShort] !== $new) {
-					$conflicts[$old] = $newShort;
+			if (array_key_exists($targetShort, $existingImports)) {
+				if ($existingImports[$targetShort] !== $old && $existingImports[$targetShort] !== $new) {
+					$conflicts[$old] = $targetShort;
 				}
 
 				continue;
@@ -207,13 +298,13 @@ class Upgrade_0_3_0 implements UpgradeStep {
 				continue;
 			}
 
-			$candidate = $namespace.'\\'.$newShort;
+			$candidate = $namespace.'\\'.$targetShort;
 
 			if (
 				$candidate !== $new &&
 				(class_exists($candidate) || interface_exists($candidate) || trait_exists($candidate) || enum_exists($candidate))
 			) {
-				$conflicts[$old] = $newShort;
+				$conflicts[$old] = $targetShort;
 			}
 		}
 
