@@ -30,11 +30,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for why) is handled the same way: the command asks once whether to
   replace it with `Illuminate\Database\Eloquent\Concerns\HasUuids` anyway,
   applying that answer to every file referencing it this step, rather than
-  only ever flagging it for a manual fix. See README's "Upgrade From
-  0.2.7" section.
+  only ever flagging it for a manual fix. If the scan finds machine-name
+  generation in use at all, it also checks whether `coyote6-base`'s config
+  is published, offers to publish it if not, and asks which
+  `machine_name.method` this app should use (defaulting to whatever's
+  already configured) rather than leaving the v0.3.0 default change to a
+  README paragraph. See README's "Upgrade From 0.2.7" section.
 - `Coyote6\LaravelBase\Upgrades\UpgradeStep` interface — the extension
   point future breaking releases use to add their own upgrade step
   alongside `Upgrade_0_3_0`, without changing `UpgradeCommand` itself.
+  Includes `additionalChecks()`, a per-step hook for whatever isn't a
+  per-file text rewrite (an environment or config check, like the
+  `machine_name.method` one above).
 
 ## [0.3.0] - 2026-08-13
 

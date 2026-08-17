@@ -152,6 +152,24 @@ whichever option in the Method table matches what you already have —
 otherwise newly-created records will get dash-separated values alongside
 your existing underscore-separated ones.
 
+The upgrade command surfaces this itself rather than leaving it to this
+paragraph: if this run's scan finds machine-name generation in use at all
+(under either the old or new trait name, so this still fires on a second
+run after the rename itself already landed), it checks whether
+`coyote6-base`'s config is published yet, offers to publish it if not, then
+asks which `machine_name.method` this app should use — defaulting to
+whatever the config already has, so pressing enter keeps the current value:
+
+```
+machine_name.method is currently "strictKebab". v0.3.0 changed the package default to strictKebab (dash-separated); every version before it always generated snake_case-shaped names, closest to strictSnake. Which method should this app use? (@see https://packagist.org/packages/coyote6/laravel-str and https://packagist.org/packages/coyote6/laravel-base)
+```
+
+Picking a different method updates the published config's `machine_name.method`
+line directly (a targeted text swap, not a full rewrite of the file, so the
+config's own per-method documentation comments are left alone). Never asked
+under `--apply`; it prints the same reminder instead and leaves the config
+untouched.
+
 ## Directory Structure
 
 - `src/Traits/Models/` — Traits meant to be used directly on Eloquent models: `BootTraits`, `GetAsOptions`, `GetAsOptionsAbbr`, `GetBySlug`.
