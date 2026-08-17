@@ -26,7 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   explicitly or just resolved via a shared namespace — the command asks
   once per distinct collision for a different alias to use instead, or
   skips and lists the file for manual review if left blank (never prompted
-  under `--apply`). See README's "Upgrade From 0.2.7" section.
+  under `--apply`). `HasUuid` (no direct replacement -- see Breaking above
+  for why) is handled the same way: the command asks once whether to
+  replace it with `Illuminate\Database\Eloquent\Concerns\HasUuids` anyway,
+  applying that answer to every file referencing it this step, rather than
+  only ever flagging it for a manual fix. See README's "Upgrade From
+  0.2.7" section.
 - `Coyote6\LaravelBase\Upgrades\UpgradeStep` interface — the extension
   point future breaking releases use to add their own upgrade step
   alongside `Upgrade_0_3_0`, without changing `UpgradeCommand` itself.

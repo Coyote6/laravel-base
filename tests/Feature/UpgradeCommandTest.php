@@ -189,6 +189,137 @@ it('flags HasUuid without rewriting it, since there is no direct replacement', f
     expect($content)->toContain('HasUuid');
 });
 
+it('declines the interactive HasUuid replacement, leaving the file untouched', function () {
+    $dir = 'upgrade-command-uuid-decline';
+    File::ensureDirectoryExists(base_path($dir));
+
+    $path = base_path("{$dir}/Example.php");
+    File::put($path, <<<'PHP'
+    <?php
+
+    use Coyote6\LaravelBase\Traits\HasUuid;
+
+    class Example
+    {
+        use HasUuid;
+    }
+    PHP);
+
+    $this->artisan('coyote6-base:upgrade', ['--path' => $dir])
+        ->expectsConfirmation(
+            "HasUuids (HasUuid's replacement) is not a pure rename -- see README/CHANGELOG for the behavior difference. Replace it anyway in 1 file?",
+            'no'
+        )
+        ->expectsOutputToContain('HasUuid has no direct replacement')
+        ->assertSuccessful();
+
+    $content = File::get($path);
+    File::deleteDirectory(base_path($dir));
+
+    expect($content)
+        ->toContain('use Coyote6\LaravelBase\Traits\HasUuid;')
+        ->toContain('use HasUuid;');
+});
+
+it('applies the HasUuid replacement when the developer confirms', function () {
+    $dir = 'upgrade-command-uuid-confirm';
+    File::ensureDirectoryExists(base_path($dir));
+
+    $path = base_path("{$dir}/Example.php");
+    File::put($path, <<<'PHP'
+    <?php
+
+    use Coyote6\LaravelBase\Traits\HasUuid;
+
+    class Example
+    {
+        use HasUuid;
+    }
+    PHP);
+
+    $this->artisan('coyote6-base:upgrade', ['--path' => $dir])
+        ->expectsConfirmation(
+            "HasUuids (HasUuid's replacement) is not a pure rename -- see README/CHANGELOG for the behavior difference. Replace it anyway in 1 file?",
+            'yes'
+        )
+        ->expectsConfirmation('Found 1 file that would change. Apply the changes?', 'yes')
+        ->assertSuccessful();
+
+    $content = File::get($path);
+    File::deleteDirectory(base_path($dir));
+
+    expect($content)
+        ->toContain('use Illuminate\Database\Eloquent\Concerns\HasUuids;')
+        ->toContain('use HasUuids;')
+        ->not->toContain('HasUuid;')
+        ->not->toContain('use HasUuid,');
+});
+
+it('never prompts for the HasUuid replacement under --apply, leaving it flagged instead', function () {
+    $dir = 'upgrade-command-uuid-apply-no-prompt';
+    File::ensureDirectoryExists(base_path($dir));
+
+    $path = base_path("{$dir}/Example.php");
+    File::put($path, <<<'PHP'
+    <?php
+
+    use Coyote6\LaravelBase\Traits\HasUuid;
+
+    class Example
+    {
+        use HasUuid;
+    }
+    PHP);
+
+    // No expectsConfirmation() stub for the replacement question -- if the
+    // command tried to ask under --apply, Mockery would throw for an
+    // unexpected confirm() call.
+    $this->artisan('coyote6-base:upgrade', ['--path' => $dir, '--apply' => true])
+        ->expectsOutputToContain('HasUuid has no direct replacement')
+        ->assertSuccessful();
+
+    $content = File::get($path);
+    File::deleteDirectory(base_path($dir));
+
+    expect($content)->toContain('use Coyote6\LaravelBase\Traits\HasUuid;');
+});
+
+it('asks once about the HasUuid replacement even when many files share it', function () {
+    $dir = 'upgrade-command-uuid-dedup';
+    File::ensureDirectoryExists(base_path($dir));
+
+    foreach (['One', 'Two'] as $name) {
+        File::put(base_path("{$dir}/{$name}.php"), <<<PHP
+        <?php
+
+        use Coyote6\LaravelBase\Traits\HasUuid;
+
+        class {$name}
+        {
+            use HasUuid;
+        }
+        PHP);
+    }
+
+    $this->artisan('coyote6-base:upgrade', ['--path' => $dir])
+        ->expectsConfirmation(
+            "HasUuids (HasUuid's replacement) is not a pure rename -- see README/CHANGELOG for the behavior difference. Replace it anyway in 2 files?",
+            'yes'
+        )
+        ->expectsConfirmation('Found 2 files that would change. Apply the changes?', 'yes')
+        ->assertSuccessful();
+
+    foreach (['One', 'Two'] as $name) {
+        $content = File::get(base_path("{$dir}/{$name}.php"));
+
+        expect($content)
+            ->toContain('use Illuminate\Database\Eloquent\Concerns\HasUuids;')
+            ->toContain('use HasUuids;');
+    }
+
+    File::deleteDirectory(base_path($dir));
+});
+
 it('skips a missing directory with a warning instead of failing', function () {
     $this->artisan('coyote6-base:upgrade', ['--path' => 'no-such-directory-here'])
         ->expectsOutputToContain('Skipping missing directory')
@@ -261,7 +392,7 @@ it('prompts for a custom alias when even the mandatory BootAuthor alias collides
 
     $this->artisan('coyote6-base:upgrade', ['--path' => $dir])
         ->expectsQuestion(
-            "Even aliased as BootAuthor, HasAuthor's replacement still collides with an existing class in 1 file. Enter a different alias to use instead, or leave blank to skip and review manually",
+            "BootAuthor (HasAuthor's replacement) collides with an existing class in 1 file. Please provide a new alias for the trait, or leave blank to skip and manually review",
             ''
         )
         ->expectsOutputToContain('collide with an existing, unrelated class already resolvable')
@@ -303,7 +434,7 @@ it('applies a developer-chosen alias when even the mandatory BootAuthor alias co
 
     $this->artisan('coyote6-base:upgrade', ['--path' => $dir])
         ->expectsQuestion(
-            "Even aliased as BootAuthor, HasAuthor's replacement still collides with an existing class in 1 file. Enter a different alias to use instead, or leave blank to skip and review manually",
+            "BootAuthor (HasAuthor's replacement) collides with an existing class in 1 file. Please provide a new alias for the trait, or leave blank to skip and manually review",
             'AuthorStamp'
         )
         ->expectsConfirmation('Found 1 file that would change. Apply the changes?', 'yes')
@@ -415,7 +546,7 @@ it('flags a trait rename that would collide with a same-namespace class that has
 
     $this->artisan('coyote6-base:upgrade', ['--path' => $dir])
         ->expectsQuestion(
-            "Even aliased as BootAuthor, HasAuthor's replacement still collides with an existing class in 1 file. Enter a different alias to use instead, or leave blank to skip and review manually",
+            "BootAuthor (HasAuthor's replacement) collides with an existing class in 1 file. Please provide a new alias for the trait, or leave blank to skip and manually review",
             ''
         )
         ->expectsOutputToContain('collide with an existing, unrelated class already resolvable')
@@ -458,7 +589,7 @@ it('still rewrites a non-conflicting trait in the same file as a conflicting one
 
     $this->artisan('coyote6-base:upgrade', ['--path' => $dir])
         ->expectsQuestion(
-            "Even aliased as BootAuthor, HasAuthor's replacement still collides with an existing class in 1 file. Enter a different alias to use instead, or leave blank to skip and review manually",
+            "BootAuthor (HasAuthor's replacement) collides with an existing class in 1 file. Please provide a new alias for the trait, or leave blank to skip and manually review",
             ''
         )
         ->expectsConfirmation('Found 1 file that would change. Apply the changes?', 'yes')
@@ -501,7 +632,7 @@ it('asks once per distinct trait collision even when many files share it', funct
 
     $this->artisan('coyote6-base:upgrade', ['--path' => $dir])
         ->expectsQuestion(
-            "Even aliased as BootAuthor, HasAuthor's replacement still collides with an existing class in 3 files. Enter a different alias to use instead, or leave blank to skip and review manually",
+            "BootAuthor (HasAuthor's replacement) collides with an existing class in 3 files. Please provide a new alias for the trait, or leave blank to skip and manually review",
             'AuthorStamp'
         )
         ->expectsConfirmation('Found 3 files that would change. Apply the changes?', 'yes')

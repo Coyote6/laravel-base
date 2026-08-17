@@ -84,12 +84,12 @@ Two situations it can't safely handle automatically:
   already resolvable in that file** — either because the file already has
   its own `use App\Models\BootClient;`, or because the file lives in the
   same namespace as a `BootClient` class and would resolve it there with
-  no import at all. When this happens, the command asks once per distinct
-  trait/collision (not once per file — the same collision typically
-  repeats across every model using that trait):
+  no import at all. To prevent asking on every model, the command asks once
+  per distinct trait/collision (not once per file) as the same collision 
+  typically repeats across every model using that trait in the same namespace:
 
   ```
-  Even aliased as BootClient, HasClient's replacement still collides with an existing class in 4 files. Enter a different alias to use instead, or leave blank to skip and review manually:
+  BootClient (HasClient's replacement) collides with an existing class in 4 files. Please provide a new alias for the trait, or leave blank to skip and manually review:
   ```
 
   Answer with a different alias to apply it everywhere that collision
@@ -99,10 +99,21 @@ Two situations it can't safely handle automatically:
   normally. This prompt is never asked under `--apply`; a still-conflicting
   rename is left untouched and reported instead, same as declining would
   do interactively.
-- **`HasUuid` has no direct replacement** (switch to Laravel's native
-  `Illuminate\Database\Eloquent\Concerns\HasUuids` — see Boot Method above
-  for the behavior difference), so files referencing it are flagged in the
-  output rather than modified.
+- **`HasUuid` has no direct replacement.** Laravel's native
+  `Illuminate\Database\Eloquent\Concerns\HasUuids` is a safe mechanical swap
+  namespace-wise, but not a pure rename behaviorally — `HasUuids` generates
+  ordered, time-sortable UUIDs by default, where `HasUuid` generated random
+  ones (see Boot Method above). So it's never applied silently; the command
+  asks once, the same way it does for a colliding alias:
+
+  ```
+  HasUuids (HasUuid's replacement) is not a pure rename -- see README/CHANGELOG for the behavior difference. Replace it anyway in 6 files?
+  ```
+
+  Answer `yes` to replace it everywhere `HasUuid` is found this step, or
+  `no` to leave those files untouched and listed under a "has no direct
+  replacement" warning instead, same as before. Never asked under
+  `--apply`; it's left flagged and reported instead of assuming an answer.
 
 Review the diff and run your own test suite before committing — this is a
 straightforward textual rewrite, not a full PHP-aware refactor, so give it
@@ -118,12 +129,15 @@ defaults match the old hardcoded names exactly, so most upgrades need no
 config changes at all. If any of your tables already used different column
 names for these before upgrading, publish the config and point
 `field`/`reference` at your existing columns instead of renaming the
-database:
+database.
+
+Example below changes the default field name, author_id to user_id.
+This was hardcoded to 'author_id' before v0.3.0
 
 ```php
 // config/coyote6-base.php
 'author' => [
-    'field' => 'user_id', // was hardcoded to 'author_id' before v0.3.0
+    'field' => 'user_id', 
 ],
 ```
 

@@ -32,10 +32,19 @@ interface UpgradeStep {
 	//                                UpgradeCommand::resolveConflictAliases()).
 	//                                A step with nothing needing this may
 	//                                ignore the parameter entirely.
+	// @param $confirmedReplacements array - Old FQCN => true, for changes
+	//                                        flagged() reported that the
+	//                                        developer confirmed applying
+	//                                        anyway despite the behavior
+	//                                        change (see
+	//                                        UpgradeCommand::resolveFlaggedReplacements()).
+	//                                        A step with nothing needing
+	//                                        this may ignore the parameter
+	//                                        entirely.
 	//
 	// @return string
 	//
-	public function rewrite (string $contents, array $customAliases = []): string;
+	public function rewrite (string $contents, array $customAliases = [], array $confirmedReplacements = []): string;
 
 
 	// Conflicts
@@ -56,9 +65,11 @@ interface UpgradeStep {
 
 	// Flagged
 	//
-	// Checks $contents for old references this step recognizes but
-	// deliberately never rewrites automatically (no safe 1:1 replacement)
-	// -- these need the developer's own manual decision.
+	// Checks $contents for old references this step recognizes but never
+	// rewrites unconditionally, because the replacement is more than a
+	// pure rename (e.g. a real behavior change) -- these need the
+	// developer's own explicit go-ahead, via $confirmedReplacements on
+	// rewrite(), not just a name collision to resolve.
 	//
 	// @param $contents string - The file contents to inspect
 	//

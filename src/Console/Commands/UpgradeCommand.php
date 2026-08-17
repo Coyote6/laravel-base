@@ -79,15 +79,16 @@ class UpgradeCommand extends Command {
 	// Scans every .php file under $directories for one upgrade step in two
 	// passes: first conflicts()/flagged() against every file's current
 	// contents, then -- once any conflict has either been resolved to a
-	// developer-chosen alias or given up on -- rewrite() against those same
-	// contents. Reports what it found, and applies the changes immediately
-	// if --apply was passed, otherwise only after the developer confirms.
-	// Declining, or finding nothing to do, moves on without writing
-	// anything; it never blocks a later step from running.
+	// developer-chosen alias (or given up on) and any flagged replacement
+	// has either been confirmed (or given up on) -- rewrite() against those
+	// same contents. Reports what it found, and applies the changes
+	// immediately if --apply was passed, otherwise only after the developer
+	// confirms. Declining, or finding nothing to do, moves on without
+	// writing anything; it never blocks a later step from running.
 	//
 	// @param $step UpgradeStep
 	// @param $directories array - Absolute paths already confirmed to exist
-	// @param $apply bool - Skip every prompt (confirmation and alias) and write immediately
+	// @param $apply bool - Skip every prompt (confirmation, alias, and replacement) and write immediately
 	//
 	// @return void
 	//
@@ -103,7 +104,7 @@ class UpgradeCommand extends Command {
 		}
 
 		$conflictsByPath = [];
-		$flagged = [];
+		$flaggedByPath = [];
 
 		foreach ($contentsByPath as $path => $original) {
 			$fileConflicts = $step->conflicts($original);
@@ -113,17 +114,19 @@ class UpgradeCommand extends Command {
 
 			$fileFlagged = $step->flagged($original);
 			if ($fileFlagged !== []) {
-				$flagged[$path] = $fileFlagged;
+				$flaggedByPath[$path] = $fileFlagged;
 			}
 		}
 
 		$aliases = $this->resolveConflictAliases($conflictsByPath, $apply);
+		$confirmedReplacements = $this->resolveFlaggedReplacements($flaggedByPath, $apply);
 
 		$changedFiles = [];
 		$remainingConflicts = [];
+		$remainingFlagged = [];
 
 		foreach ($contentsByPath as $path => $original) {
-			$updated = $step->rewrite($original, $aliases);
+			$updated = $step->rewrite($original, $aliases, $confirmedReplacements);
 
 			if ($updated !== $original) {
 				$changedFiles[$path] = $updated;
@@ -136,9 +139,17 @@ class UpgradeCommand extends Command {
 					$remainingConflicts[$path] = $stillConflicting;
 				}
 			}
+
+			if (isset($flaggedByPath[$path])) {
+				$stillFlagged = array_diff_key($flaggedByPath[$path], $confirmedReplacements);
+
+				if ($stillFlagged !== []) {
+					$remainingFlagged[$path] = $stillFlagged;
+				}
+			}
 		}
 
-		$this->reportFlagged($flagged);
+		$this->reportFlagged($remainingFlagged);
 		$this->reportConflicts($remainingConflicts);
 
 		if ($changedFiles === []) {
@@ -230,7 +241,7 @@ class UpgradeCommand extends Command {
 			$label = Str::plural('file', $count);
 
 			$answer = $this->ask(
-				"Even aliased as {$shortName}, ".class_basename($old)."'s replacement still collides with an existing class in {$count} {$label}. Enter a different alias to use instead, or leave blank to skip and review manually"
+				"{$shortName} (".class_basename($old)."'s replacement) collides with an existing class in {$count} {$label}. Please provide a new alias for the trait, or leave blank to skip and manually review"
 			);
 
 			if (is_string($answer) && trim($answer) !== '') {
@@ -239,6 +250,61 @@ class UpgradeCommand extends Command {
 		}
 
 		return $aliases;
+	}
+
+
+	// Resolve Flagged Replacements
+	//
+	// Asks the developer once per distinct old=>new pair flagged() reported
+	// across every file scanned this step, whether to apply it anyway --
+	// not once per file, for the same reason resolveConflictAliases() asks
+	// once per trait rather than once per file. A flagged entry is never
+	// applied without an explicit yes, since (unlike RENAMED_TRAITS) it's
+	// not a pure rename -- it can carry a real behavior change the
+	// developer needs to actually agree to, not just discover after the
+	// fact. Never prompts when $apply is set; a flagged replacement just
+	// stays unconfirmed and gets reported for manual review, same as
+	// declining here would.
+	//
+	// @param $flaggedByPath array - File path => [old FQCN => new FQCN, ...]
+	// @param $apply bool - Skip prompting entirely
+	//
+	// @return array Old FQCN => true, only for replacements the developer confirmed
+	//
+	protected function resolveFlaggedReplacements (array $flaggedByPath, bool $apply): array
+	{
+		$distinct = [];
+		$fileCounts = [];
+
+		foreach ($flaggedByPath as $pairs) {
+			foreach ($pairs as $old => $new) {
+				$distinct[$old] = $new;
+				$fileCounts[$old] = ($fileCounts[$old] ?? 0) + 1;
+			}
+		}
+
+		if ($distinct === [] || $apply) {
+			return [];
+		}
+
+		$confirmed = [];
+
+		foreach ($distinct as $old => $new) {
+			$count = $fileCounts[$old];
+			$label = Str::plural('file', $count);
+
+			$newShort = class_basename($new);
+
+			$answer = $this->confirm(
+				"{$newShort} (".class_basename($old)."'s replacement) is not a pure rename -- see README/CHANGELOG for the behavior difference. Replace it anyway in {$count} {$label}?"
+			);
+
+			if ($answer) {
+				$confirmed[$old] = true;
+			}
+		}
+
+		return $confirmed;
 	}
 
 

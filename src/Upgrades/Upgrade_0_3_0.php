@@ -47,9 +47,12 @@ class Upgrade_0_3_0 implements UpgradeStep {
 	// Interactive Replacements
 	//
 	// Old fully-qualified trait name => new fully-qualified trait name, for
-	// traits with no direct 1:1 replacement -- these are never rewritten
-	// unconditionally. flagged() reports files referencing one so the
-	// developer can decide by hand.
+	// traits with no direct 1:1 replacement -- never rewritten
+	// unconditionally the way RENAMED_TRAITS is. flagged() reports files
+	// referencing one; UpgradeCommand::resolveFlaggedReplacements() asks
+	// the developer once per distinct entry whether to apply it anyway,
+	// and rewrite() only touches a file if that entry's old FQCN is present
+	// in $confirmedReplacements.
 	//
 	// @ai
 	//		HasUuid -> Illuminate\Database\Eloquent\Concerns\HasUuids is a
@@ -60,7 +63,8 @@ class Upgrade_0_3_0 implements UpgradeStep {
 	//		default, where HasUuid generated random ones (Str::uuid()). That
 	//		behavior change is real enough that it shouldn't happen without
 	//		the developer explicitly agreeing to it, unlike the unconditional
-	//		renames above.
+	//		renames above -- hence a yes/no confirmation rather than folding
+	//		it into RENAMED_TRAITS.
 	protected const INTERACTIVE_REPLACEMENTS = [
 		'Coyote6\LaravelBase\Traits\HasUuid' => 'Illuminate\Database\Eloquent\Concerns\HasUuids',
 	];
@@ -83,17 +87,23 @@ class Upgrade_0_3_0 implements UpgradeStep {
 	// its MANDATORY_ALIASES entry when it has one (otherwise its own bare
 	// short name), plus the bare short class name (word-boundary-safe) to
 	// catch `use ShortName;` trait inclusions left pointing at the old name
-	// once its import line changes.
+	// once its import line changes. Also applies any INTERACTIVE_REPLACEMENTS
+	// entry the developer confirmed via $confirmedReplacements.
 	//
 	// @param $contents string - The file contents to rewrite
 	// @param $customAliases array - Old FQCN => developer-chosen alias, for
 	//                                renames still conflicting even under
 	//                                their MANDATORY_ALIASES entry (see
 	//                                UpgradeCommand::resolveConflictAliases())
+	// @param $confirmedReplacements array - Old FQCN => true, for
+	//                                        INTERACTIVE_REPLACEMENTS entries
+	//                                        the developer confirmed applying
+	//                                        (see
+	//                                        UpgradeCommand::resolveFlaggedReplacements())
 	//
 	// @return string
 	//
-	public function rewrite (string $contents, array $customAliases = []): string
+	public function rewrite (string $contents, array $customAliases = [], array $confirmedReplacements = []): string
 	{
 		$renamed = $this->sortedRenames();
 		$conflicts = $this->detectConflicts($contents, $renamed);
@@ -114,6 +124,14 @@ class Upgrade_0_3_0 implements UpgradeStep {
 			}
 
 			$contents = $this->applyRename($contents, $old, $new, self::MANDATORY_ALIASES[$old] ?? class_basename($new));
+		}
+
+		foreach (self::INTERACTIVE_REPLACEMENTS as $old => $new) {
+			if (empty($confirmedReplacements[$old]) || !str_contains($contents, $old)) {
+				continue;
+			}
+
+			$contents = $this->applyRename($contents, $old, $new, class_basename($new));
 		}
 
 		return $contents;
