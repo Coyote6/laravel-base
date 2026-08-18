@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-08-18
+
+No functional changes from 0.3.1. This marks the public API stable per
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html): the v0.3.0
+namespace/trait rename is the last breaking change on the books, the
+upgrade command has been exercised against a real production-sized
+application (~150 models, including a real `Client` model colliding with
+the mandatory `BootClient` alias, with zero manual intervention needed),
+and CI is green on PHP 8.3/8.4 against both lowest and highest allowed
+dependency versions.
+
 ## [0.3.1] - 2026-08-13
 
 ### Added
@@ -154,6 +165,7 @@ Behavioral changes beyond the namespace/class renames:
   there wasn't — so `HasClient`'s `client_id` was silently always null in
   the normal case. The method is removed; see Breaking above.
 
-[Unreleased]: https://github.com/Coyote6/laravel-base/compare/v0.3.1...master
+[Unreleased]: https://github.com/Coyote6/laravel-base/compare/v1.0.0...master
+[1.0.0]: https://github.com/Coyote6/laravel-base/compare/v0.3.1...v1.0.0
 [0.3.1]: https://github.com/Coyote6/laravel-base/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/Coyote6/laravel-base/compare/v0.2.7...v0.3.0
