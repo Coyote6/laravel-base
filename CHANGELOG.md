@@ -165,7 +165,7 @@ Behavioral changes beyond the namespace/class renames:
   there wasn't — so `HasClient`'s `client_id` was silently always null in
   the normal case. The method is removed; see Breaking above.
 
-[Unreleased]: https://github.com/Coyote6/laravel-base/compare/v1.0.0...master
+[Unreleased]: https://github.com/Coyote6/laravel-base/compare/v1.0.0...main
 [1.0.0]: https://github.com/Coyote6/laravel-base/compare/v0.3.1...v1.0.0
 [0.3.1]: https://github.com/Coyote6/laravel-base/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/Coyote6/laravel-base/compare/v0.2.7...v0.3.0
