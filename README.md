@@ -103,8 +103,8 @@ Two situations it can't safely handle automatically:
   `Illuminate\Database\Eloquent\Concerns\HasUuids` is a safe mechanical swap
   namespace-wise, but not a pure rename behaviorally — `HasUuids` generates
   ordered, time-sortable UUIDs by default, where `HasUuid` generated random
-  ones (see Boot Method above). So it's never applied silently; the command
-  asks once, the same way it does for a colliding alias:
+  ones. So it's never applied silently; the command asks once, the same way
+  it does for a colliding alias:
 
   ```
   HasUuids (HasUuid's replacement) is not a pure rename -- see README/CHANGELOG for the behavior difference. Replace it anyway in 6 files?
@@ -145,7 +145,10 @@ This was hardcoded to 'author_id' before v0.3.0
 `BootMachineName`/`BootMachineNameAsId` always lowercased and replaced every
 non-alphanumeric character with an underscore — snake_case-shaped output.
 The new default is `strictKebab` (dash-separated), since that's now the
-package-wide default `machine_name.method`. If your existing `machine_name`
+package-wide default `machine_name.method` — see
+[`coyote6/laravel-str`](https://packagist.org/packages/coyote6/laravel-str)
+for what `strictKebab` and the other available methods actually do. If your
+existing `machine_name`
 values (or anything reading them) depend on the old underscore-separated
 format, publish the config and set `machine_name.method` explicitly to
 whichever option in the Method table matches what you already have —
