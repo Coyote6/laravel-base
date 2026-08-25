@@ -135,6 +135,46 @@ return [
 
     //
     //--------------------------------------------------------------------------
+    // Owner
+    //--------------------------------------------------------------------------
+    //
+    // Configures the Owner trait, which stamps the current authenticated
+    // user's id onto new records.
+    //
+
+    'owner' => [
+
+        // Field
+        //
+        // The attribute the current user's id is written to.
+        //
+        'field' => 'owner_id',
+
+    ],
+
+
+    //
+    //--------------------------------------------------------------------------
+    // User
+    //--------------------------------------------------------------------------
+    //
+    // Configures the User trait, which stamps the current authenticated
+    // user's id onto new records.
+    //
+
+    'user' => [
+
+        // Field
+        //
+        // The attribute the current user's id is written to.
+        //
+        'field' => 'user_id',
+
+    ],
+
+
+    //
+    //--------------------------------------------------------------------------
     // Client
     //--------------------------------------------------------------------------
     //

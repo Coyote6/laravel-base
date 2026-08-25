@@ -8,7 +8,7 @@ trait MachineName {
 	use ResolvesMachineName;
 
 
-	// Create Machine Name
+	// Assign Machine Name On Model Creation
 	//
 	// Sets the configured field (coyote6-base.machine_name.field) from the
 	// configured reference attribute, via resolveMachineName(), unless a
@@ -16,7 +16,7 @@ trait MachineName {
 	//
 	// @return void
 	//
-	public function createMachineName () {
+	public function assignMachineNameOnModelCreation () {
 		$field = config('coyote6-base.machine_name.field', 'machine_name');
 
 		if (is_null ($this->{$field}) || $this->{$field} == '') {

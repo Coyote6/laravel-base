@@ -6,7 +6,9 @@ use Coyote6\LaravelBase\Traits\Models\Boot\Author;
 use Coyote6\LaravelBase\Traits\Models\Boot\Client;
 use Coyote6\LaravelBase\Traits\Models\Boot\MachineName;
 use Coyote6\LaravelBase\Traits\Models\Boot\OriginalAuthor;
+use Coyote6\LaravelBase\Traits\Models\Boot\Owner;
 use Coyote6\LaravelBase\Traits\Models\Boot\Slug;
+use Coyote6\LaravelBase\Traits\Models\Boot\User;
 use Coyote6\LaravelBase\Traits\Models\BootTraits;
 use Coyote6\LaravelBase\Traits\Models\GetBySlug;
 use Illuminate\Database\Eloquent\Model;
@@ -15,6 +17,8 @@ class TestModel extends Model
 {
     use Author;
     use OriginalAuthor;
+    use Owner;
+    use User;
     use Client;
     use MachineName;
     use Slug;
@@ -28,6 +32,8 @@ class TestModel extends Model
         'title',
         'author_id',
         'original_author_id',
+        'owner_id',
+        'user_id',
         'client_id',
         'machine_name',
         'slug',

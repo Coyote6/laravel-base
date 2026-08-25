@@ -7,7 +7,7 @@ namespace Coyote6\LaravelBase\Traits\Models\Boot;
 trait Client {
 
 	
-	// Create Client
+	// Assign Client On Model Creation
 	//
 	// Sets the configured field (coyote6-base.client.field) to the current
 	// user's client id, via getCurrentUserClientId(), unless a value is
@@ -15,7 +15,7 @@ trait Client {
 	//
 	// @return void
 	//
-	public function createClient () {
+	public function assignClientOnModelCreation () {
 		$field = config('coyote6-base.client.field', 'client_id');
 
 		if (is_null ($this->{$field}) || $this->{$field} == '') {

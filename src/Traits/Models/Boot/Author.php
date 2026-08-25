@@ -6,7 +6,7 @@ namespace Coyote6\LaravelBase\Traits\Models\Boot;
 
 trait Author {
 
-	// Create Author
+	// Assign Author On Model Creation
 	//
 	// Sets the configured field (coyote6-base.author.field) to the current
 	// user's id, unless a value is already present -- this preserves an
@@ -15,7 +15,7 @@ trait Author {
 	//
 	// @return void
 	//
-	public function createAuthor () {
+	public function assignAuthorOnModelCreation () {
 		$field = config('coyote6-base.author.field', 'author_id');
 
 		if (is_null ($this->{$field}) || $this->{$field} == '') {

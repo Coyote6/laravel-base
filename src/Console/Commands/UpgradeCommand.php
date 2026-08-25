@@ -4,6 +4,7 @@
 namespace Coyote6\LaravelBase\Console\Commands;
 
 use Coyote6\LaravelBase\Upgrades\Upgrade_0_3_0;
+use Coyote6\LaravelBase\Upgrades\Upgrade_2_0_0;
 use Coyote6\LaravelBase\Upgrades\UpgradeStep;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
@@ -70,6 +71,7 @@ class UpgradeCommand extends Command {
 	{
 		return [
 			new Upgrade_0_3_0(),
+			new Upgrade_2_0_0(),
 		];
 	}
 

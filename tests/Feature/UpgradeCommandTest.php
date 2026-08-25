@@ -890,3 +890,201 @@ it('asks once per distinct trait collision even when many files share it', funct
 
     File::deleteDirectory(base_path($dir));
 });
+
+it('renames every v2.0.0 OnModelCreation method definition and call site', function () {
+    $dir = 'upgrade-command-on-model-creation-rename';
+    File::ensureDirectoryExists(base_path($dir));
+
+    // Deliberately excludes createMachineName -- its bare "MachineName"
+    // substring also trips Upgrade_0_3_0::additionalChecks()' unrelated
+    // machine_name.method reminder, which is covered in its own test below
+    // instead of tangling that separate interactive flow into this one.
+    $path = base_path("{$dir}/Example.php");
+    File::put($path, <<<'PHP'
+    <?php
+
+    class Example
+    {
+        public function createAuthor()
+        {
+            $this->author_id = 1;
+        }
+
+        public function createOriginalAuthor()
+        {
+            $this->original_author_id = 1;
+        }
+
+        public function createClient()
+        {
+            $this->client_id = 1;
+        }
+
+        public function createSlug()
+        {
+            $this->slug = 'example';
+        }
+
+        public function save()
+        {
+            $this->createAuthor();
+            $this->createOriginalAuthor();
+            $this->createClient();
+            $this->createSlug();
+        }
+    }
+    PHP);
+
+    $this->artisan('coyote6-base:upgrade', ['--path' => $dir])
+        ->expectsOutputToContain('Running v2.0.0 upgrades')
+        ->expectsConfirmation('Found 1 file that would change. Apply the changes?', 'yes')
+        ->assertSuccessful();
+
+    $updated = File::get($path);
+    File::deleteDirectory(base_path($dir));
+
+    expect($updated)
+        ->toContain('function assignAuthorOnModelCreation()')
+        ->toContain('function assignOriginalAuthorOnModelCreation()')
+        ->toContain('function assignClientOnModelCreation()')
+        ->toContain('function assignSlugOnModelCreation()')
+        ->toContain('$this->assignAuthorOnModelCreation();')
+        ->toContain('$this->assignOriginalAuthorOnModelCreation();')
+        ->toContain('$this->assignClientOnModelCreation();')
+        ->toContain('$this->assignSlugOnModelCreation();')
+        ->not->toContain('function createAuthor()')
+        ->not->toContain('function createOriginalAuthor()')
+        ->not->toContain('function createClient()')
+        ->not->toContain('function createSlug()');
+});
+
+it('renames createMachineName to assignMachineNameOnModelCreation, alongside the unrelated v0.3.0 machine_name.method reminder', function () {
+    $dir = 'upgrade-command-on-model-creation-machine-name';
+    File::ensureDirectoryExists(base_path($dir));
+
+    $path = base_path("{$dir}/Example.php");
+    File::put($path, <<<'PHP'
+    <?php
+
+    class Example
+    {
+        public function createMachineName()
+        {
+            $this->machine_name = 'example';
+        }
+
+        public function save()
+        {
+            $this->createMachineName();
+        }
+    }
+    PHP);
+
+    $this->artisan('coyote6-base:upgrade', ['--path' => $dir])
+        ->expectsOutputToContain('Running v0.3.0 upgrades')
+        ->expectsConfirmation(
+            "This app uses machine-name generation (MachineName/MachineNameAsId), but hasn't published coyote6-base's config yet. Publish it now so machine_name.method can be reviewed?",
+            'no'
+        )
+        ->expectsOutputToContain('Running v2.0.0 upgrades')
+        ->expectsConfirmation('Found 1 file that would change. Apply the changes?', 'yes')
+        ->assertSuccessful();
+
+    $updated = File::get($path);
+    File::deleteDirectory(base_path($dir));
+
+    expect($updated)
+        ->toContain('function assignMachineNameOnModelCreation()')
+        ->toContain('$this->assignMachineNameOnModelCreation();')
+        ->not->toContain('function createMachineName()');
+});
+
+it('leaves an already-renamed OnModelCreation method untouched on a second run', function () {
+    $dir = 'upgrade-command-on-model-creation-idempotent';
+    File::ensureDirectoryExists(base_path($dir));
+
+    $path = base_path("{$dir}/Example.php");
+    $original = <<<'PHP'
+    <?php
+
+    class Example
+    {
+        public function assignAuthorOnModelCreation()
+        {
+            $this->author_id = 1;
+        }
+    }
+    PHP;
+    File::put($path, $original);
+
+    $this->artisan('coyote6-base:upgrade', ['--path' => $dir, '--apply' => true])
+        ->expectsOutputToContain('Running v2.0.0 upgrades')
+        ->expectsOutputToContain('No file changes found.')
+        ->assertSuccessful();
+
+    $unchanged = File::get($path);
+    File::deleteDirectory(base_path($dir));
+
+    expect($unchanged)->toBe($original);
+});
+
+it('does not rename createAuthor when assignAuthorOnModelCreation is already defined too, to avoid a duplicate method', function () {
+    $dir = 'upgrade-command-on-model-creation-duplicate-guard';
+    File::ensureDirectoryExists(base_path($dir));
+
+    $path = base_path("{$dir}/Example.php");
+    $original = <<<'PHP'
+    <?php
+
+    class Example
+    {
+        public function createAuthor()
+        {
+            $this->author_id = 1;
+        }
+
+        public function assignAuthorOnModelCreation()
+        {
+            $this->author_id = 2;
+        }
+    }
+    PHP;
+    File::put($path, $original);
+
+    $this->artisan('coyote6-base:upgrade', ['--path' => $dir, '--apply' => true])
+        ->expectsOutputToContain('Running v2.0.0 upgrades')
+        ->assertSuccessful();
+
+    $unchanged = File::get($path);
+    File::deleteDirectory(base_path($dir));
+
+    expect($unchanged)->toBe($original);
+});
+
+it('does not rename an unrelated method that merely starts with the same name', function () {
+    $dir = 'upgrade-command-on-model-creation-false-positive';
+    File::ensureDirectoryExists(base_path($dir));
+
+    $path = base_path("{$dir}/Example.php");
+    $original = <<<'PHP'
+    <?php
+
+    class Example
+    {
+        public function createAuthorReport()
+        {
+            return 'report';
+        }
+    }
+    PHP;
+    File::put($path, $original);
+
+    $this->artisan('coyote6-base:upgrade', ['--path' => $dir, '--apply' => true])
+        ->expectsOutputToContain('Running v2.0.0 upgrades')
+        ->assertSuccessful();
+
+    $unchanged = File::get($path);
+    File::deleteDirectory(base_path($dir));
+
+    expect($unchanged)->toBe($original);
+});

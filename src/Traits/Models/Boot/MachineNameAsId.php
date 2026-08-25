@@ -9,7 +9,7 @@ trait MachineNameAsId {
 	use ResolvesMachineName;
 
 
-	// Create Machine Name
+	// Assign Machine Name On Model Creation
 	//
 	// Sets the model's primary key from the configured reference attribute,
 	// via resolveMachineName(), unless a value is already present. Use
@@ -18,7 +18,7 @@ trait MachineNameAsId {
 	//
 	// @return void
 	//
-	public function createMachineName () {
+	public function assignMachineNameOnModelCreation () {
 		if (is_null ($this->{$this->getKeyName()}) || $this->{$this->getKeyName()} == '') {
 			$this->{$this->getKeyName()} = $this->resolveMachineName ($this->{$this->resolveMachineNameReference()});
 		}

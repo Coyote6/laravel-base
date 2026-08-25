@@ -10,9 +10,11 @@ trait BootTraits {
 	// Boot
 	//
 	// Registers Eloquent model-event listeners that call each optional
-	// convention method when it exists on the model: createAuthor,
-	// createOriginalAuthor, createClient, createMachineName, and createSlug
-	// on creating; modelCreating/modelCreated on create;
+	// convention method when it exists on the model: assignAuthorOnModelCreation,
+	// assignOriginalAuthorOnModelCreation, assignOwnerOnModelCreation,
+	// assignUserOnModelCreation, assignClientOnModelCreation,
+	// assignMachineNameOnModelCreation, and assignSlugOnModelCreation on
+	// creating; modelCreating/modelCreated on create;
 	// modelUpdating/modelUpdated on update; modelDeleting/modelDeleted on
 	// delete. A model opts into any of this behavior just by defining the
 	// matching method itself, or by composing the trait that defines it --
@@ -21,40 +23,50 @@ trait BootTraits {
 	// @return void
 	//
 	protected static function boot() {
-	
+
 		parent::boot();
-		
+
 		static::creating(function ($model) {
-			
+
 			if (method_exists ($model, 'modelCreating')) {
         		$model->modelCreating();
     		}
-						
-			if (method_exists ($model, 'createAuthor')) {
-				$model->createAuthor();
+
+			if (method_exists ($model, 'assignAuthorOnModelCreation')) {
+				$model->assignAuthorOnModelCreation();
 
 			}
 
-			if (method_exists ($model, 'createOriginalAuthor')) {
-				$model->createOriginalAuthor();
+			if (method_exists ($model, 'assignOriginalAuthorOnModelCreation')) {
+				$model->assignOriginalAuthorOnModelCreation();
 
 			}
 
-			if (method_exists ($model, 'createClient')) {
-				$model->createClient();
-				
-			}
-			
-			if (method_exists ($model, 'createMachineName')) {
-				$model->createMachineName();
+			if (method_exists ($model, 'assignOwnerOnModelCreation')) {
+				$model->assignOwnerOnModelCreation();
 
 			}
 
-			if (method_exists ($model, 'createSlug')) {
-				$model->createSlug();
+			if (method_exists ($model, 'assignUserOnModelCreation')) {
+				$model->assignUserOnModelCreation();
 
 			}
-			
+
+			if (method_exists ($model, 'assignClientOnModelCreation')) {
+				$model->assignClientOnModelCreation();
+
+			}
+
+			if (method_exists ($model, 'assignMachineNameOnModelCreation')) {
+				$model->assignMachineNameOnModelCreation();
+
+			}
+
+			if (method_exists ($model, 'assignSlugOnModelCreation')) {
+				$model->assignSlugOnModelCreation();
+
+			}
+
         });
         
 	    static::created (function ($model) {

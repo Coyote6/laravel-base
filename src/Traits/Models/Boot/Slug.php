@@ -9,7 +9,7 @@ use Illuminate\Support\Str;
 trait Slug {
 
 
-	// Create Slug
+	// Assign Slug On Model Creation
 	//
 	// Generates a slug via Str::slug(), using the coyote6-base.slug config
 	// for the source/destination fields and Str::slug()'s
@@ -17,7 +17,7 @@ trait Slug {
 	//
 	// @return void
 	//
-	public function createSlug () {
+	public function assignSlugOnModelCreation () {
 		$field = config('coyote6-base.slug.field', 'slug');
 		$reference = config('coyote6-base.slug.reference', 'name');
 

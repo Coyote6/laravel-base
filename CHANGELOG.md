@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-08-25
+
+This is a breaking release despite v1.0.0's stability declaration below —
+see Breaking.
+
+### Breaking
+
+Every `BootTraits` convention method was renamed from its old `create*` verb
+to `assign*...OnModelCreation`, to make explicit that it assigns a value
+(unless one is already present) rather than creating anything, and that it
+fires on Eloquent's `creating` event. (An `OnBoot` suffix was considered and
+rejected — it would have collided in spirit with this package's own
+unrelated "Boot" terminology: `BootTraits`, the `Boot/` namespace, Laravel's
+own `boot()`.)
+
+| Old | New |
+|---|---|
+| `createAuthor` | `assignAuthorOnModelCreation` |
+| `createOriginalAuthor` | `assignOriginalAuthorOnModelCreation` |
+| `createClient` | `assignClientOnModelCreation` |
+| `createMachineName` | `assignMachineNameOnModelCreation` |
+| `createSlug` | `assignSlugOnModelCreation` |
+
+No deprecation shim ships for the old names. Most apps are unaffected —
+`BootTraits` calls these methods internally by name, so a model that only
+composes one of the `Boot/*` traits (never defining or calling the method
+itself) picks up the new name automatically. This only matters for a model
+that manually defines, overrides, or directly calls one of these methods.
+`Upgrade_2_0_0` (`Coyote6\LaravelBase\Upgrades`) automates the rename via
+`php artisan coyote6-base:upgrade` — renames both the method definition and
+any `->` call site, preserving the original whitespace style rather than
+imposing this package's own. See README's "Upgrade From 1.0.0".
+
+### Added
+
+- `Owner` and `User` traits (`Coyote6\LaravelBase\Traits\Models\Boot`) —
+  set `owner.field` (default `owner_id`) and `user.field` (default
+  `user_id`) to the current user's id, unless already set. Same behavior
+  as `Author`, under their own field/config, for models that need an
+  owner or user reference distinct from an author. New in this release, so
+  they ship directly with the `assign*OnModelCreation` naming above — wired
+  into `BootTraits` via
+  `assignOwnerOnModelCreation()`/`assignUserOnModelCreation()`.
+  `User` in particular will almost always need its import aliased
+  (`use ...\Boot\User as BootUser;`) in any model that also references
+  `App\Models\User`, since nearly every Laravel app has one.
+- `Upgrade_2_0_0` upgrade step — see Breaking above.
+
 ## [1.0.0] - 2026-08-18
 
 No functional changes from 0.3.1. This marks the public API stable per

@@ -173,13 +173,45 @@ config's own per-method documentation comments are left alone). Never asked
 under `--apply`; it prints the same reminder instead and leaves the config
 untouched.
 
+## Upgrade From 1.0.0
+
+v2.0.0 is a breaking release: every `BootTraits` convention method was
+renamed from its old `create*` verb to `assign*...OnModelCreation`, to make
+explicit that it assigns a value (unless one is already present) rather than
+creating anything, and that it fires on Eloquent's `creating` event.
+
+| Old | New |
+|---|---|
+| `createAuthor` | `assignAuthorOnModelCreation` |
+| `createOriginalAuthor` | `assignOriginalAuthorOnModelCreation` |
+| `createClient` | `assignClientOnModelCreation` |
+| `createMachineName` | `assignMachineNameOnModelCreation` |
+| `createSlug` | `assignSlugOnModelCreation` |
+
+`Owner`/`User` are new in this same release and already ship with the
+`assign*OnModelCreation` names — there's nothing to migrate for either.
+
+Most apps should be unaffected as `BootTraits` calls these methods internally by
+name, so a model that only composes one of the `Boot/*` traits (never
+defining or calling the method itself) picks up the new name automatically,
+with no code changes needed. This only matters if your own code manually
+defines one of these methods (to opt into the `BootTraits` convention
+without using the trait), overrides one of these trait methods, or calls one
+directly.
+
+The same `php artisan coyote6-base:upgrade` command documented above picks
+this up as its own step — re-running it after upgrading also runs
+`Running v2.0.0 upgrades`, renaming both the method definition and any `->`
+call site, and leaving already-renamed code untouched (safe to run
+repeatedly). No deprecation shim ships for the old names.
+
 ## Directory Structure
 
 - `src/Traits/Models/` — Traits meant to be used directly on Eloquent models: `BootTraits`, `GetAsOptions`, `GetAsOptionsAbbr`, `GetBySlug`.
-- `src/Traits/Models/Boot/` — Creation-helper traits that provide the `create*` hook methods `BootTraits` looks for via `method_exists()`: `Author`, `OriginalAuthor`, `Client`, `MachineName`, `MachineNameAsId`, `Slug`, and the shared internal helper `ResolvesMachineName`. Always used alongside `BootTraits` on the model, never alone.
+- `src/Traits/Models/Boot/` — Creation-helper traits that provide the `assign*OnModelCreation` hook methods `BootTraits` looks for via `method_exists()`: `Author`, `OriginalAuthor`, `Owner`, `User`, `Client`, `MachineName`, `MachineNameAsId`, `Slug`, and the shared internal helper `ResolvesMachineName`. Always used alongside `BootTraits` on the model, never alone.
 - `src/Traits/Database/` — Traits meant to be used on service providers, migrations, or other database-related classes: `DropsIndexes`, `ServiceProviderSeedsDb`.
 - `src/Traits/Files/` — `ReadsCsv`, for reading a CSV file into an array.
-- `src/Upgrades/` — `UpgradeStep` (the interface every upgrade step implements) and `Upgrade_0_3_0` (the v0.2.7 → v0.3.0 step) — see "Upgrade From 0.2.7" above.
+- `src/Upgrades/` — `UpgradeStep` (the interface every upgrade step implements), `Upgrade_0_3_0` (the v0.2.7 → v0.3.0 step, see "Upgrade From 0.2.7" above), and `Upgrade_2_0_0` (the v1.0.0 → v2.0.0 step, see "Upgrade From 1.0.0" above).
 - `src/Console/Commands/UpgradeCommand.php` — the `coyote6-base:upgrade` Artisan command; runs every step registered in its own `steps()` method.
 - `src/Helpers/Helpers.php` — Global helper functions (`getCurrentUserId()`, `getCurrentUserClientId()`), autoloaded on every request via composer's `files` autoload.
 - `src/Providers/BaseServiceProvider.php` — Merges/publishes `config/coyote6-base.php` and registers `coyote6-base:upgrade`.
@@ -197,6 +229,8 @@ All config lives under the `coyote6-base` key. Every `field`/`reference` option 
 | `machine_name.method_parameters` | `null` | `ResolvesMachineName` — extra arguments passed to `machine_name.method`, if any |
 | `author.field` | `author_id` | `Author` |
 | `original_author.field` | `original_author_id` | `OriginalAuthor` |
+| `owner.field` | `owner_id` | `Owner` |
+| `user.field` | `user_id` | `User` |
 | `client.field` | `client_id` | `Client` (destination attribute) |
 | `client.reference` | `client_id` | `Client`, `getCurrentUserClientId()` (attribute read off the current user) |
 | `slug.field` | `slug` | `Slug` (destination attribute) |
@@ -211,7 +245,7 @@ All config lives under the `coyote6-base` key. Every `field`/`reference` option 
 
 ### Boot Method
 
-`Coyote6\LaravelBase\Traits\Models\BootTraits` — registers Eloquent model-event listeners (`creating`, `created`, `updating`, `updated`, `deleting`, `deleted`) that call a matching convention method on the model if it exists: `createAuthor`, `createOriginalAuthor`, `createClient`, `createMachineName`, `createSlug` on `creating`; `modelCreating`/`modelCreated`/`modelUpdating`/`modelUpdated`/`modelDeleting`/`modelDeleted` at their respective events. A model opts into any of this just by defining the method — directly, or via one of the `Boot/*` traits below — `BootTraits` itself never requires any of them to exist.
+`Coyote6\LaravelBase\Traits\Models\BootTraits` — registers Eloquent model-event listeners (`creating`, `created`, `updating`, `updated`, `deleting`, `deleted`) that call a matching convention method on the model if it exists: `assignAuthorOnModelCreation`, `assignOriginalAuthorOnModelCreation`, `assignOwnerOnModelCreation`, `assignUserOnModelCreation`, `assignClientOnModelCreation`, `assignMachineNameOnModelCreation`, `assignSlugOnModelCreation` on `creating`; `modelCreating`/`modelCreated`/`modelUpdating`/`modelUpdated`/`modelDeleting`/`modelDeleted` at their respective events. A model opts into any of this just by defining the method — directly, or via one of the `Boot/*` traits below — `BootTraits` itself never requires any of them to exist.
 
 For UUID primary keys, use Laravel's native `Illuminate\Database\Eloquent\Concerns\HasUuids` trait — this package no longer ships its own `Uuid` method.
 
@@ -221,16 +255,19 @@ All under `Coyote6\LaravelBase\Traits\Models\Boot`:
 
 - **`Author`** — sets `author.field` (default `author_id`) to the current user's id, unless already set (so an explicitly bulk-filled value, e.g. from an import, is preserved rather than overwritten).
 - **`OriginalAuthor`** — sets `original_author.field` (default `original_author_id`) to the current user's id the same way, independently of `Author`. Meant as a permanent, foreign-key-free record of who created a row, for schemas where `author_id` has an `ON DELETE SET NULL` foreign key back to `users`.
+- **`Owner`** — sets `owner.field` (default `owner_id`) to the current user's id, unless already set. Same behavior as `Author`, under its own field/config for models that need an owner distinct from an author.
+- **`User`** — sets `user.field` (default `user_id`) to the current user's id, unless already set. Same behavior as `Author`, under its own field/config for models that need a user reference distinct from an author or owner.
 - **`Client`** — sets `client.field` (default `client_id`) to the current user's `client.reference` attribute (default `client_id`), via `getCurrentUserClientId()`.
 - **`MachineName`** — sets `machine_name.field` (default `machine_name`) from `machine_name.reference` (default `name`), via `ResolvesMachineName`.
-- **`MachineNameAsId`** — same as `MachineName`, but writes to the model's primary key instead of a separate field. Use one or the other, never both — they share the `createMachineName` method name and will fatal on a trait collision if combined.
+- **`MachineNameAsId`** — same as `MachineName`, but writes to the model's primary key instead of a separate field. Use one or the other, never both — they share the `assignMachineNameOnModelCreation` method name and will fatal on a trait collision if combined.
 - **`Slug`** — sets `slug.field` (default `slug`) from `slug.reference` (default `name`) via `Str::slug()`, using `slug.separator`/`slug.language`/`slug.dictionary`.
 - **`ResolvesMachineName`** — internal; composed by `MachineName` and `MachineNameAsId`, not meant to be `use`d directly on a model. Provides `resolveMachineName()` and `resolveMachineNameReference()`.
 
-If your app already has its own `Author`/`Client`/etc. class and needs both,
-alias the import (`use ...\Boot\Client as BootClient;`) — see "Upgrade From
-0.2.7" above for why the automated upgrade command always does this by
-default.
+It is recommended to always alias the traits to prevent class name collisions. For instance, if your model already has its own `User`/`Client`/etc. class reference then adding the short name of the matching class is likely to create an issue. The `User` trait is a perfect and very common example of this issue.
+
+Nearly every Laravel app has its own `App\Models\User`. Because the `User::class` is commonly in the same namespace as the other models, it may be common for a developer to reference the `User` model directly without an explicit `use` statement (e.g. a `belongsTo(User::class)`). If you were to add `use ...\Boot\User` without the alias, then the trait will override the shared namespace model and cause errors. If the model already has an explicit `use` statement (e.g. `use App\Models\User;`), it will throw a fatal error instead.
+
+For that reason, we always recommend aliasing the `Boot/*` traits on import (`use ...\Boot\User as BootUser;`).
 
 ### Select Dropdown/Radio Button Helpers
 
@@ -307,7 +344,7 @@ class Example extends Model {
 }
 ```
 
-On create, this fills `author_id` and `client_id` from the current user, and generates `machine_name`/`slug` from `name` — all only when not already set. `BootTraits` is what actually wires `createAuthor()`/`createClient()`/`createMachineName()`/`createSlug()` into Eloquent's `creating` event; it must be included alongside the others.
+On create, this fills `author_id` and `client_id` from the current user, and generates `machine_name`/`slug` from `name` — all only when not already set. `BootTraits` is what actually wires `assignAuthorOnModelCreation()`/`assignClientOnModelCreation()`/`assignMachineNameOnModelCreation()`/`assignSlugOnModelCreation()` into Eloquent's `creating` event; it must be included alongside the others.
 
 ### OriginalAuthor
 

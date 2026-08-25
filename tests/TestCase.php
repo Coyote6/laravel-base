@@ -37,6 +37,9 @@ abstract class TestCase extends Orchestra
             $table->string('user_id')->nullable();
             $table->string('author_id')->nullable();
             $table->string('original_author_id')->nullable();
+            $table->string('owner_id')->nullable();
+            $table->string('created_by')->nullable();
+            $table->string('assigned_to')->nullable();
             $table->string('client_id')->nullable();
             $table->string('tenant_id')->nullable();
             $table->string('owner')->nullable();
