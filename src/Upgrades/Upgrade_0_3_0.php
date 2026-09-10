@@ -97,6 +97,21 @@ class Upgrade_0_3_0 implements UpgradeStep {
 	}
 
 
+	// Prepare
+	//
+	// Nothing to discover up front -- every rename this step makes is
+	// self-contained to the file being rewritten.
+	//
+	// @param $contentsByPath array - File path => contents, from this step's scan
+	//
+	// @return void
+	//
+	public function prepare (array $contentsByPath): void
+	{
+		//
+	}
+
+
 	// Rewrite
 	//
 	// Applies every non-conflicting renamed-trait substitution to

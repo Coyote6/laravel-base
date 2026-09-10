@@ -5,6 +5,7 @@ namespace Coyote6\LaravelBase\Console\Commands;
 
 use Coyote6\LaravelBase\Upgrades\Upgrade_0_3_0;
 use Coyote6\LaravelBase\Upgrades\Upgrade_2_0_0;
+use Coyote6\LaravelBase\Upgrades\Upgrade_2_1_0;
 use Coyote6\LaravelBase\Upgrades\UpgradeStep;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
@@ -72,13 +73,16 @@ class UpgradeCommand extends Command {
 		return [
 			new Upgrade_0_3_0(),
 			new Upgrade_2_0_0(),
+			new Upgrade_2_1_0(),
 		];
 	}
 
 
 	// Run Step
 	//
-	// Scans every .php file under $directories for one upgrade step in two
+	// Scans every .php file under $directories for one upgrade step, hands
+	// the whole set to the step's prepare() so it can note anything a
+	// per-file rewrite will need from elsewhere in the scan, then runs two
 	// passes: first conflicts()/flagged() against every file's current
 	// contents, then -- once any conflict has either been resolved to a
 	// developer-chosen alias (or given up on) and any flagged replacement
@@ -108,6 +112,8 @@ class UpgradeCommand extends Command {
 		foreach ($this->phpFiles($directories) as $path) {
 			$contentsByPath[$path] = File::get($path);
 		}
+
+		$step->prepare($contentsByPath);
 
 		$conflictsByPath = [];
 		$flaggedByPath = [];

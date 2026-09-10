@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-09-10
+
+### Added
+
+- `GetAsOptions::getAsOptions()` now takes `string $key = 'id'`,
+  `string $field = 'name'`, `int $limit = 0`, `int $page = 1`, and
+  `?Closure $modifyQuery = null` — so one trait produces an `id => name`,
+  `abbr => name`, `id => abbr`, or any other `$key => $field` option list,
+  paginated if `$limit` is set. `$modifyQuery` is handed the query builder
+  before it runs, to filter (`where`/`whereIn`/`whereHas`/scopes), re-order, or
+  scope the list; when given it owns the ordering, so a filter-only closure
+  should add its own `orderBy`. `$modifyQuery = null` sorts by `$field`
+  ascending. The default no-argument call is unchanged.
+- `Upgrade_2_1_0` — a `coyote6-base:upgrade` step that migrates
+  `GetAsOptionsAbbr` to `GetAsOptions`: swaps the trait on every model that
+  composes it, then adds `'abbr'` as the first argument to every resolvable
+  no-argument `Model::getAsOptions()` call across the scan (and the
+  `self::`/`static::`/`$this->` calls in the model's own file). Idempotent;
+  reports the cases it won't touch on its own (a model with both traits, a
+  call that already passes arguments, a `->getAsOptions()` call on an
+  unresolvable receiver). See "Upgrade From 2.0.0" in the README.
+- `UpgradeStep::prepare(array $contentsByPath)` — an interface method run
+  once per step before the conflict/rewrite passes, for a step whose per-file
+  rewrite needs something discovered elsewhere in the scan (e.g. which
+  classes compose a given trait). Existing steps implement it as a no-op.
+
+### Changed
+
+- `GetAsOptions::getAsOptions()` no longer memoizes its result in a static
+  variable. Every call queries the database so the column selection, order,
+  page, and data are always current, and a long-lived process (Octane, queue
+  workers) never serves a stale list. Assign the result to a variable if a
+  single request needs it more than once.
+
+### Deprecated
+
+- The `GetAsOptionsAbbr` trait. Compose `GetAsOptions` instead and call
+  `getAsOptions('abbr')` — `php artisan coyote6-base:upgrade` does this for
+  you. `GetAsOptionsAbbr::getAsOptions()` keeps working as a thin shim that
+  forwards every argument to `getAsOptions()`, now raising an
+  `E_USER_DEPRECATED` notice on every call. Output is unchanged beyond the
+  notice.
+
 ## [2.0.0] - 2026-08-25
 
 This is a breaking release despite v1.0.0's stability declaration below —
@@ -213,7 +256,9 @@ Behavioral changes beyond the namespace/class renames:
   there wasn't — so `HasClient`'s `client_id` was silently always null in
   the normal case. The method is removed; see Breaking above.
 
-[Unreleased]: https://github.com/Coyote6/laravel-base/compare/v1.0.0...main
+[Unreleased]: https://github.com/Coyote6/laravel-base/compare/v2.1.0...main
+[2.1.0]: https://github.com/Coyote6/laravel-base/compare/v2.0.0...v2.1.0
+[2.0.0]: https://github.com/Coyote6/laravel-base/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/Coyote6/laravel-base/compare/v0.3.1...v1.0.0
 [0.3.1]: https://github.com/Coyote6/laravel-base/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/Coyote6/laravel-base/compare/v0.2.7...v0.3.0

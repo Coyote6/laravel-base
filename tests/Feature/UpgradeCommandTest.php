@@ -1088,3 +1088,309 @@ it('does not rename an unrelated method that merely starts with the same name', 
 
     expect($unchanged)->toBe($original);
 });
+
+it('v2.1.0: swaps GetAsOptionsAbbr for GetAsOptions and passes the abbr key at every resolvable call site', function () {
+    $dir = 'upgrade-command-abbr';
+    File::ensureDirectoryExists(base_path("{$dir}/Models"));
+    File::ensureDirectoryExists(base_path("{$dir}/Livewire"));
+
+    File::put(base_path("{$dir}/Models/State.php"), <<<'PHP'
+    <?php
+
+    namespace App\Models;
+
+    use Coyote6\LaravelBase\Traits\Models\GetAsOptionsAbbr;
+    use Illuminate\Database\Eloquent\Model;
+
+    class State extends Model
+    {
+        use GetAsOptionsAbbr;
+
+        public function asList(): array
+        {
+            return self::getAsOptions();
+        }
+    }
+    PHP);
+
+    File::put(base_path("{$dir}/Livewire/StateForm.php"), <<<'PHP'
+    <?php
+
+    namespace App\Livewire;
+
+    use App\Models\State;
+
+    class StateForm
+    {
+        public array $states = [];
+
+        public function mount(): void
+        {
+            $this->states = State::getAsOptions();
+            $also = \App\Models\State::getAsOptions();
+        }
+    }
+    PHP);
+
+    $this->artisan('coyote6-base:upgrade', ['--path' => $dir, '--apply' => true])
+        ->expectsOutputToContain('Running v2.1.0 upgrades')
+        ->assertSuccessful();
+
+    $model = File::get(base_path("{$dir}/Models/State.php"));
+    $form = File::get(base_path("{$dir}/Livewire/StateForm.php"));
+    File::deleteDirectory(base_path($dir));
+
+    expect($model)
+        ->toContain('use Coyote6\LaravelBase\Traits\Models\GetAsOptions;')
+        ->toContain('use GetAsOptions;')
+        ->toContain("return self::getAsOptions('abbr');")
+        ->not->toContain('GetAsOptionsAbbr');
+
+    expect($form)
+        ->toContain("State::getAsOptions('abbr');")
+        ->toContain("\\App\\Models\\State::getAsOptions('abbr');")
+        ->not->toContain('State::getAsOptions();');
+});
+
+it('v2.1.0: resolves a same-namespace model call and an aliased trait import', function () {
+    $dir = 'upgrade-command-abbr-namespace-alias';
+    File::ensureDirectoryExists(base_path($dir));
+
+    File::put(base_path("{$dir}/Country.php"), <<<'PHP'
+    <?php
+
+    namespace App\Models;
+
+    use Coyote6\LaravelBase\Traits\Models\GetAsOptionsAbbr as AbbrOptions;
+    use Illuminate\Database\Eloquent\Model;
+
+    class Country extends Model
+    {
+        use AbbrOptions;
+    }
+    PHP);
+
+    File::put(base_path("{$dir}/CountryHelper.php"), <<<'PHP'
+    <?php
+
+    namespace App\Models;
+
+    class CountryHelper
+    {
+        public function options(): array
+        {
+            return Country::getAsOptions();
+        }
+    }
+    PHP);
+
+    $this->artisan('coyote6-base:upgrade', ['--path' => $dir, '--apply' => true])->assertSuccessful();
+
+    $model = File::get(base_path("{$dir}/Country.php"));
+    $helper = File::get(base_path("{$dir}/CountryHelper.php"));
+    File::deleteDirectory(base_path($dir));
+
+    expect($model)
+        ->toContain('use Coyote6\LaravelBase\Traits\Models\GetAsOptions as AbbrOptions;')
+        ->toContain('use AbbrOptions;')
+        ->not->toContain('GetAsOptionsAbbr');
+
+    expect($helper)->toContain("return Country::getAsOptions('abbr');");
+});
+
+it('v2.1.0: is idempotent -- a second run changes nothing', function () {
+    $dir = 'upgrade-command-abbr-idempotent';
+    File::ensureDirectoryExists(base_path($dir));
+
+    File::put(base_path("{$dir}/State.php"), <<<'PHP'
+    <?php
+
+    namespace App\Models;
+
+    use Coyote6\LaravelBase\Traits\Models\GetAsOptionsAbbr;
+    use Illuminate\Database\Eloquent\Model;
+
+    class State extends Model
+    {
+        use GetAsOptionsAbbr;
+    }
+    PHP);
+
+    File::put(base_path("{$dir}/Form.php"), <<<'PHP'
+    <?php
+
+    namespace App\Http;
+
+    use App\Models\State;
+
+    class Form
+    {
+        public function options(): array
+        {
+            return State::getAsOptions();
+        }
+    }
+    PHP);
+
+    $this->artisan('coyote6-base:upgrade', ['--path' => $dir, '--apply' => true])->assertSuccessful();
+
+    $afterFirst = [
+        File::get(base_path("{$dir}/State.php")),
+        File::get(base_path("{$dir}/Form.php")),
+    ];
+
+    $this->artisan('coyote6-base:upgrade', ['--path' => $dir, '--apply' => true])
+        ->expectsOutputToContain('Running v2.1.0 upgrades')
+        ->expectsOutputToContain('No file changes found.')
+        ->assertSuccessful();
+
+    $afterSecond = [
+        File::get(base_path("{$dir}/State.php")),
+        File::get(base_path("{$dir}/Form.php")),
+    ];
+    File::deleteDirectory(base_path($dir));
+
+    expect($afterSecond)->toBe($afterFirst);
+});
+
+it('v2.1.0: leaves a model composing both traits untouched, reporting it instead', function () {
+    $dir = 'upgrade-command-abbr-both-traits';
+    File::ensureDirectoryExists(base_path($dir));
+
+    $path = base_path("{$dir}/Weird.php");
+    $original = <<<'PHP'
+    <?php
+
+    namespace App\Models;
+
+    use Coyote6\LaravelBase\Traits\Models\GetAsOptions;
+    use Coyote6\LaravelBase\Traits\Models\GetAsOptionsAbbr;
+    use Illuminate\Database\Eloquent\Model;
+
+    class Weird extends Model
+    {
+        use GetAsOptions, GetAsOptionsAbbr;
+    }
+    PHP;
+    File::put($path, $original);
+
+    $this->artisan('coyote6-base:upgrade', ['--path' => $dir, '--apply' => true])
+        ->expectsOutputToContain('compose both GetAsOptions and GetAsOptionsAbbr')
+        ->assertSuccessful();
+
+    $unchanged = File::get($path);
+    File::deleteDirectory(base_path($dir));
+
+    expect($unchanged)->toBe($original);
+});
+
+it('v2.1.0: does not touch a plain GetAsOptions model or its call sites', function () {
+    $dir = 'upgrade-command-abbr-plain-untouched';
+    File::ensureDirectoryExists(base_path($dir));
+
+    $path = base_path("{$dir}/City.php");
+    $original = <<<'PHP'
+    <?php
+
+    namespace App\Models;
+
+    use Coyote6\LaravelBase\Traits\Models\GetAsOptions;
+    use Illuminate\Database\Eloquent\Model;
+
+    class City extends Model
+    {
+        use GetAsOptions;
+
+        public function options(): array
+        {
+            return City::getAsOptions();
+        }
+    }
+    PHP;
+    File::put($path, $original);
+
+    $this->artisan('coyote6-base:upgrade', ['--path' => $dir, '--apply' => true])
+        ->expectsOutputToContain('Running v2.1.0 upgrades')
+        ->assertSuccessful();
+
+    $unchanged = File::get($path);
+    File::deleteDirectory(base_path($dir));
+
+    expect($unchanged)->toBe($original);
+});
+
+it('v2.1.0: flags an unresolvable ->getAsOptions() call for a manual fix', function () {
+    $dir = 'upgrade-command-abbr-unresolved';
+    File::ensureDirectoryExists(base_path($dir));
+
+    File::put(base_path("{$dir}/State.php"), <<<'PHP'
+    <?php
+
+    namespace App\Models;
+
+    use Coyote6\LaravelBase\Traits\Models\GetAsOptionsAbbr;
+    use Illuminate\Database\Eloquent\Model;
+
+    class State extends Model
+    {
+        use GetAsOptionsAbbr;
+    }
+    PHP);
+
+    $callerPath = base_path("{$dir}/Report.php");
+    File::put($callerPath, <<<'PHP'
+    <?php
+
+    namespace App\Support;
+
+    class Report
+    {
+        public function build($state): array
+        {
+            return $state->getAsOptions();
+        }
+    }
+    PHP);
+
+    $this->artisan('coyote6-base:upgrade', ['--path' => $dir, '--apply' => true])
+        ->expectsOutputToContain("call ->getAsOptions() on a value this step can't resolve")
+        ->expectsOutputToContain($callerPath)
+        ->assertSuccessful();
+
+    $caller = File::get($callerPath);
+    File::deleteDirectory(base_path($dir));
+
+    expect($caller)->toContain('return $state->getAsOptions();');
+});
+
+it('v2.1.0: applies on a plain confirmation, without --apply', function () {
+    $dir = 'upgrade-command-abbr-confirm';
+    File::ensureDirectoryExists(base_path($dir));
+
+    $path = base_path("{$dir}/State.php");
+    File::put($path, <<<'PHP'
+    <?php
+
+    namespace App\Models;
+
+    use Coyote6\LaravelBase\Traits\Models\GetAsOptionsAbbr;
+    use Illuminate\Database\Eloquent\Model;
+
+    class State extends Model
+    {
+        use GetAsOptionsAbbr;
+    }
+    PHP);
+
+    $this->artisan('coyote6-base:upgrade', ['--path' => $dir])
+        ->expectsOutputToContain('Running v2.1.0 upgrades')
+        ->expectsConfirmation('Found 1 file that would change. Apply the changes?', 'yes')
+        ->assertSuccessful();
+
+    $updated = File::get($path);
+    File::deleteDirectory(base_path($dir));
+
+    expect($updated)
+        ->toContain('use Coyote6\LaravelBase\Traits\Models\GetAsOptions;')
+        ->not->toContain('GetAsOptionsAbbr');
+});

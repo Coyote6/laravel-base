@@ -205,13 +205,45 @@ this up as its own step — re-running it after upgrading also runs
 call site, and leaving already-renamed code untouched (safe to run
 repeatedly). No deprecation shim ships for the old names.
 
+## Upgrade From 2.0.0
+
+v2.1.0 deprecates the `GetAsOptionsAbbr` trait. `GetAsOptions::getAsOptions()`
+now takes a `$key` (plus `$field`, `$limit`, `$page`, `$modifyQuery`), so one
+trait covers an `abbr`-keyed list too — `getAsOptions('abbr')`.
+`GetAsOptionsAbbr::getAsOptions()` still works, now as a shim over
+`getAsOptions('abbr')` that raises an `E_USER_DEPRECATED` notice on every
+call, so nothing breaks the moment you upgrade — the migration can happen on
+your schedule.
+
+The same `php artisan coyote6-base:upgrade` command handles it as its
+`Running v2.1.0 upgrades` step. For every model composing `GetAsOptionsAbbr`
+it swaps the trait for `GetAsOptions` (import and class-body `use`, keeping
+any `as` alias), and then across every scanned file — so point `--path` at
+everything that could call these models, e.g.
+`--path=app,resources` — it adds `'abbr'` as the first argument to each
+no-argument `Model::getAsOptions()` call it can resolve to one of those
+models (imported, same-namespace, or fully qualified), plus any
+`self::`/`static::`/`$this->` call in the model's own file. Idempotent and
+safe to re-run.
+
+It deliberately leaves three things for you, reporting each with the file
+path:
+
+- a model composing **both** `GetAsOptions` and `GetAsOptionsAbbr` (never
+  valid — they declare the same method);
+- a `Model::getAsOptions(...)` call that **already passes arguments** — `$key`
+  is the first parameter now, so you decide whether `'abbr'` belongs ahead of
+  what's there;
+- a `->getAsOptions()` call on a **variable, relation, or query result** the
+  tool can't resolve to a class.
+
 ## Directory Structure
 
-- `src/Traits/Models/` — Traits meant to be used directly on Eloquent models: `BootTraits`, `GetAsOptions`, `GetAsOptionsAbbr`, `GetBySlug`.
+- `src/Traits/Models/` — Traits meant to be used directly on Eloquent models: `BootTraits`, `GetAsOptions`, `GetAsOptionsAbbr` (deprecated), `GetBySlug`.
 - `src/Traits/Models/Boot/` — Creation-helper traits that provide the `assign*OnModelCreation` hook methods `BootTraits` looks for via `method_exists()`: `Author`, `OriginalAuthor`, `Owner`, `User`, `Client`, `MachineName`, `MachineNameAsId`, `Slug`, and the shared internal helper `ResolvesMachineName`. Always used alongside `BootTraits` on the model, never alone.
 - `src/Traits/Database/` — Traits meant to be used on service providers, migrations, or other database-related classes: `DropsIndexes`, `ServiceProviderSeedsDb`.
 - `src/Traits/Files/` — `ReadsCsv`, for reading a CSV file into an array.
-- `src/Upgrades/` — `UpgradeStep` (the interface every upgrade step implements), `Upgrade_0_3_0` (the v0.2.7 → v0.3.0 step, see "Upgrade From 0.2.7" above), and `Upgrade_2_0_0` (the v1.0.0 → v2.0.0 step, see "Upgrade From 1.0.0" above).
+- `src/Upgrades/` — `UpgradeStep` (the interface every upgrade step implements), `Upgrade_0_3_0` (the v0.2.7 → v0.3.0 step, see "Upgrade From 0.2.7" above), `Upgrade_2_0_0` (the v1.0.0 → v2.0.0 step, see "Upgrade From 1.0.0" above), and `Upgrade_2_1_0` (the `GetAsOptionsAbbr` → `GetAsOptions` migration, see "Upgrade From 2.0.0" above).
 - `src/Console/Commands/UpgradeCommand.php` — the `coyote6-base:upgrade` Artisan command; runs every step registered in its own `steps()` method.
 - `src/Helpers/Helpers.php` — Global helper functions (`getCurrentUserId()`, `getCurrentUserClientId()`), autoloaded on every request via composer's `files` autoload.
 - `src/Providers/BaseServiceProvider.php` — Merges/publishes `config/coyote6-base.php` and registers `coyote6-base:upgrade`.
@@ -273,10 +305,10 @@ For that reason, we always recommend aliasing the `Boot/*` traits on import (`us
 
 Both under `Coyote6\LaravelBase\Traits\Models`, and both expose the same method name `getAsOptions()` — use one or the other, never both together on the same model:
 
-- **`GetAsOptions`** — `id => name` option list, ordered by name.
-- **`GetAsOptionsAbbr`** — `abbr => name` option list, ordered by name (e.g. states, countries).
+- **`GetAsOptions`** — `static::getAsOptions(string $key = 'id', string $field = 'name', int $limit = 0, int $page = 1, ?Closure $modifyQuery = null)`, a `$key => $field` option list. Defaults to `id => name` ordered by name; pass `'abbr'`, `'code'`, or any other attribute to key by that instead, `$limit`/`$page` to paginate (`$limit = 0` returns everything), and a `$modifyQuery` closure to filter, re-order, or scope the underlying query.
+- **`GetAsOptionsAbbr`** — **deprecated.** A thin shim over `GetAsOptions::getAsOptions('abbr')` that emits an `E_USER_DEPRECATED` notice on every call. Compose `GetAsOptions` and call `getAsOptions('abbr')` instead.
 
-Both cache their result in a static variable after the first call.
+Nothing is cached — every call queries the database, so the column selection, order, page, and data are always current. Assign the result to a variable if one request needs it more than once.
 
 ### Query Helpers
 
@@ -457,9 +489,17 @@ class ExampleController extends Controller {
 }
 ```
 
-### Get As Options Abbreviation
+### Options Keyed Or Labelled By Another Field
 
-Same usage as `GetAsOptions`, but keyed by `abbr` — note the method name is still `getAsOptions()`, not `getAsOptionsAbbr()`:
+`getAsOptions(string $key = 'id', string $field = 'name', int $limit = 0, int $page = 1, ?Closure $modifyQuery = null)`. `$key` is the array key, `$field` the label, `$limit`/`$page` paginate, and `$modifyQuery` is a closure handed the query builder before it runs — filter (`where`, `whereIn`, `whereHas`, a scope), re-order, whatever. When you pass it, it owns the ordering (the default `$field` ascending is not applied), so a filter-only closure should add its own `orderBy`. Any column works — `abbr` for states or countries, a `code`, a `slug`, etc.:
+
+Every parameter has a default, so use named arguments to set just the one (or few) you need without spelling out the earlier ones or remembering their order:
+
+```php
+Country::getAsOptions(key: 'abbr');
+Status::getAsOptions(limit: 50, modifyQuery: fn ($q) => $q->where('active', true));
+Team::getAsOptions(field: 'title', key: 'name');
+```
 
 `app/Models/Example.php`
 ```php
@@ -467,7 +507,7 @@ Same usage as `GetAsOptions`, but keyed by `abbr` — note the method name is st
 
 namespace App\Models;
 
-use Coyote6\LaravelBase\Traits\Models\GetAsOptionsAbbr;
+use Coyote6\LaravelBase\Traits\Models\GetAsOptions;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -476,7 +516,7 @@ use Illuminate\Database\Eloquent\Model;
 class Example extends Model {
 
     use HasFactory,
-        GetAsOptionsAbbr;
+        GetAsOptions;
 
     public $incrementing = false;
     protected $keyType = 'string';
@@ -485,6 +525,7 @@ class Example extends Model {
         'id',
         'abbr',
         'name',
+        'title',
     ];
 
 }
@@ -499,13 +540,27 @@ use App\Http\Controllers\Controller;
 use App\Models\Example;
 
 class ExampleController extends Controller {
-    
+
     public function index () {
-        dd (Example::getAsOptions());
+        dd (Example::getAsOptions('abbr'));                // ['CA' => 'California', ...]
+        dd (Example::getAsOptions('id', 'abbr'));          // [5 => 'CA', 12 => 'NY', ...]
+        dd (Example::getAsOptions('id', 'name', 25, 2));   // page 2, 25 per page
+        dd (Example::getAsOptions(field: 'title'));        // [5 => 'A Book Title', ...] -- keyed by id, labelled by title
+
+        // Filter and/or re-order via $modifyQuery -- e.g. a dependent dropdown,
+        // or statuses in workflow order off a position column.
+        dd (Example::getAsOptions(
+            modifyQuery: fn ($query) => $query->where ('country_abbr', 'US')->orderBy ('name'),
+        ));
+        dd (Example::getAsOptions(
+            modifyQuery: fn ($query) => $query->orderBy ('position'),
+        ));
     }
-    
+
 }
 ```
+
+> **Deprecated:** the `GetAsOptionsAbbr` trait still works — as a shim over `getAsOptions('abbr')` that raises an `E_USER_DEPRECATED` notice — but there is no longer a reason to use it. Swap `use GetAsOptionsAbbr;` for `use GetAsOptions;` and pass `'abbr'` at the call site.
 
 ### Get By Slug
 

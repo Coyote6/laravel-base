@@ -2,20 +2,46 @@
 
 use Coyote6\LaravelBase\Tests\Fixtures\TestOptionAbbrModel;
 
-it('returns an abbr => name option list ordered by name, cached after the first call', function () {
-    $charlie = TestOptionAbbrModel::create(['name' => 'Charlie', 'abbr' => 'C']);
-    $alice = TestOptionAbbrModel::create(['name' => 'Alice', 'abbr' => 'A']);
+it('still returns an abbr => name list via a deprecated shim that emits an E_USER_DEPRECATED notice', function () {
+    TestOptionAbbrModel::create(['name' => 'Charlie', 'abbr' => 'C']);
+    TestOptionAbbrModel::create(['name' => 'Alice', 'abbr' => 'A']);
 
-    $options = TestOptionAbbrModel::getAsOptions();
+    // Laravel's own error handler swallows E_USER_DEPRECATED into the log, so
+    // catch it directly rather than via PHPUnit's expectUserDeprecationMessage().
+    $deprecations = [];
+    set_error_handler(function (int $errno, string $errstr) use (&$deprecations) {
+        $deprecations[] = $errstr;
+
+        return true;
+    }, E_USER_DEPRECATED);
+
+    try {
+        $options = TestOptionAbbrModel::getAsOptions();
+    } finally {
+        restore_error_handler();
+    }
 
     expect($options)->toBe([
         'A' => 'Alice',
         'C' => 'Charlie',
     ]);
+    expect($deprecations)->not->toBeEmpty()
+        ->each->toContain("Compose the GetAsOptions trait instead and call getAsOptions('abbr')");
+});
 
-    // Created after the first call -- should not appear, since getAsOptions()
-    // caches its result in a static variable per composing class.
-    TestOptionAbbrModel::create(['name' => 'Bob', 'abbr' => 'B']);
+it('forwards every argument -- positional and named -- through the variadic shim', function () {
+    foreach (['Alice' => 'A', 'Bob' => 'B', 'Carol' => 'C'] as $name => $abbr) {
+        TestOptionAbbrModel::create(['name' => $name, 'abbr' => $abbr]);
+    }
 
-    expect(TestOptionAbbrModel::getAsOptions())->toBe($options);
+    set_error_handler(fn () => true, E_USER_DEPRECATED);
+    try {
+        $page2 = TestOptionAbbrModel::getAsOptions('abbr', 'name', 2, 2);
+        $filtered = TestOptionAbbrModel::getAsOptions('abbr', 'name', modifyQuery: fn ($q) => $q->where('abbr', '!=', 'B')->orderByDesc('name'));
+    } finally {
+        restore_error_handler();
+    }
+
+    expect($page2)->toBe(['C' => 'Carol']);
+    expect($filtered)->toBe(['C' => 'Carol', 'A' => 'Alice']);
 });

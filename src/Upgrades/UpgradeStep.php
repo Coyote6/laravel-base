@@ -19,6 +19,23 @@ interface UpgradeStep {
 	public function version (): string;
 
 
+	// Prepare
+	//
+	// Runs once per step, before any file's conflicts()/flagged()/rewrite()
+	// is called, with every scanned file's contents. For a step whose
+	// per-file rewrite depends on something discovered elsewhere in the
+	// scan -- e.g. which classes compose a given trait, so calls to those
+	// classes in other files can be rewritten too. A step whose every
+	// rewrite is self-contained to the file it touches may implement this as
+	// a no-op.
+	//
+	// @param $contentsByPath array - File path => contents, from this step's scan
+	//
+	// @return void
+	//
+	public function prepare (array $contentsByPath): void;
+
+
 	// Rewrite
 	//
 	// Returns $contents with every applicable change for this step
