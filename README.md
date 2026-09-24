@@ -305,7 +305,7 @@ For that reason, we always recommend aliasing the `Boot/*` traits on import (`us
 
 Both under `Coyote6\LaravelBase\Traits\Models`, and both expose the same method name `getAsOptions()` — use one or the other, never both together on the same model:
 
-- **`GetAsOptions`** — `static::getAsOptions(string $key = 'id', string $field = 'name', int $limit = 0, int $page = 1, ?Closure $modifyQuery = null)`, a `$key => $field` option list. Defaults to `id => name` ordered by name; pass `'abbr'`, `'code'`, or any other attribute to key by that instead, `$limit`/`$page` to paginate (`$limit = 0` returns everything), and a `$modifyQuery` closure to filter, re-order, or scope the underlying query.
+- **`GetAsOptions`** — `static::getAsOptions(string $key = 'id', string|Expression|Closure $field = 'name', int $limit = 0, int $page = 1, ?Closure $modifyQuery = null)`, a `$key => $field` option list. Defaults to `id => name` ordered by name; pass `'abbr'`, `'code'`, or any other attribute to key by that instead, `$limit`/`$page` to paginate (`$limit = 0` returns everything), and a `$modifyQuery` closure to filter, re-order, or scope the underlying query. `$field` also accepts a `DB::raw()` `Expression` or a `Closure(Model): string` when the label isn't a single column — see [Computed Labels](#computed-labels) below.
 - **`GetAsOptionsAbbr`** — **deprecated.** A thin shim over `GetAsOptions::getAsOptions('abbr')` that emits an `E_USER_DEPRECATED` notice on every call. Compose `GetAsOptions` and call `getAsOptions('abbr')` instead.
 
 Nothing is cached — every call queries the database, so the column selection, order, page, and data are always current. Assign the result to a variable if one request needs it more than once.
@@ -561,6 +561,37 @@ class ExampleController extends Controller {
 ```
 
 > **Deprecated:** the `GetAsOptionsAbbr` trait still works — as a shim over `getAsOptions('abbr')` that raises an `E_USER_DEPRECATED` notice — but there is no longer a reason to use it. Swap `use GetAsOptionsAbbr;` for `use GetAsOptions;` and pass `'abbr'` at the call site.
+
+### Computed Labels
+
+`$field` is usually a column name, but also accepts a `DB::raw()` `Expression`
+or a `Closure(Model): string` when the label isn't a single column — e.g. a
+country code prefixed onto a state name:
+
+```php
+use Illuminate\Support\Facades\DB;
+
+// DB-computed -- one query, but the concatenation syntax is dialect-specific
+// (MySQL/MariaDB CONCAT() vs SQLite/Postgres ||, SQL Server +). Alias it so
+// the label can be pulled out of the result row.
+State::getAsOptions(
+    field: DB::raw("CONCAT(country_id, ' - ', name) AS label"),
+    modifyQuery: fn ($query) => $query->orderBy('country_id')->orderBy('name'),
+);
+
+// PHP-computed -- portable across every driver, at the cost of a full get()
+// in place of a lean two-column pluck().
+State::getAsOptions(
+    field: fn (State $state) => "{$state->country_id} - {$state->name}",
+    modifyQuery: fn ($query) => $query->orderBy('country_id')->orderBy('name'),
+);
+```
+
+Neither form gets the default `$field`-ascending sort — an `Expression` can't
+be reused inside `ORDER BY` once it carries an alias, and a `Closure`'s label
+doesn't exist at the SQL level to sort by at all. Pass `$modifyQuery` for
+ordering whenever `$field` isn't a plain column, same as any other
+custom-ordering call.
 
 ### Get By Slug
 

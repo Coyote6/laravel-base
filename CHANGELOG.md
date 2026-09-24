@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-09-24
+
+### Added
+
+- `GetAsOptions::getAsOptions()`'s `$field` now also accepts a `DB::raw()`
+  `Expression` (a DB-computed label, e.g. a concatenation — alias it so the
+  label can be pulled from the result row; dialect-specific, e.g.
+  MySQL/MariaDB `CONCAT()` vs SQLite/Postgres `||` vs SQL Server `+`, so
+  don't use this if the same call has to run against more than one driver)
+  or a `Closure(Model): string` (a PHP-computed label, portable across every
+  driver, at the cost of a full `get()` in place of a lean two-column
+  `pluck()`). Neither gets the default `$field`-ascending sort — pass
+  `$modifyQuery` for ordering whenever `$field` isn't a plain column, same as
+  any other custom-ordering call. The plain-string `$field` case is
+  unchanged. See "Computed Labels" in the README.
+
 ## [2.1.0] - 2026-09-10
 
 ### Added

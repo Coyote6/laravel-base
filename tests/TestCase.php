@@ -57,6 +57,7 @@ abstract class TestCase extends Orchestra
         Schema::create('test_option_models', function (Blueprint $table) {
             $table->id();
             $table->string('name')->nullable();
+            $table->string('code')->nullable();
             $table->timestamps();
         });
 

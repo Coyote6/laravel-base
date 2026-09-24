@@ -13,5 +13,6 @@ class TestOptionModel extends Model
 
     protected $fillable = [
         'name',
+        'code',
     ];
 }
