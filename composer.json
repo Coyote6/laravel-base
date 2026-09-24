@@ -20,6 +20,7 @@
         "coyote6/laravel-str": "^1.0"
     },
     "require-dev": {
+        "larastan/larastan": "^3.9",
         "orchestra/testbench": "^10.0|^11.0",
         "pestphp/pest": "^4.7",
         "pestphp/pest-plugin-laravel": "^4.1"
@@ -45,9 +46,14 @@
         }
     },
     "scripts": {
-        "test": "@php vendor/bin/pest"
+        "types:check": "phpstan analyse",
+        "test": [
+            "@types:check",
+            "@php vendor/bin/pest"
+        ]
     },
     "config": {
+        "sort-packages": true,
         "allow-plugins": {
             "pestphp/pest-plugin": true
         }

@@ -22,6 +22,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `$modifyQuery` for ordering whenever `$field` isn't a plain column, same as
   any other custom-ordering call. The plain-string `$field` case is
   unchanged. See "Computed Labels" in the README.
+- `larastan/larastan` + `phpstan.neon` (level 5), with a `composer types:check`
+  script folded into `composer test`. Since this package ships only traits
+  (no models of its own), `phpstan.neon`'s `paths` includes `tests/Fixtures`
+  alongside `src` — PHPStan can't analyse a trait's method bodies without a
+  host class using it (see [phpstan.org/blog/how-phpstan-analyses-traits](https://phpstan.org/blog/how-phpstan-analyses-traits)),
+  and every trait in `src/` is composed by at least one fixture.
+- A `test-mariadb` CI job (`.github/workflows/tests.yml`), running the full
+  suite against a real `mariadb:11` service container on PHP 8.4. Closes a
+  real coverage gap: `DropsIndexesTest` relies on MySQL/MariaDB-only syntax
+  and was previously always skipped in CI, which only ever installed sqlite.
+
+### Fixed
+
+- `GetAsOptions::getAsOptions()`'s default sort passed `'ASC'` (uppercase) to
+  `orderBy()`. Not a runtime bug — Laravel lowercases the direction string
+  either way — but it's what PHPStan's new `argument.type` check (level 5
+  expects `'asc'|'desc'`) caught once static analysis was wired up.
 
 ## [2.1.0] - 2026-09-10
 

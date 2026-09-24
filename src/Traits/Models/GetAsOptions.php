@@ -71,7 +71,7 @@ trait GetAsOptions {
 		if ($modifyQuery) {
 			$modifyQuery ($query);
 		} elseif (is_string ($field)) {
-			$query->orderBy ($field, 'ASC');
+			$query->orderBy ($field, 'asc');
 		}
 
 		if ($limit > 0) {
