@@ -318,7 +318,7 @@ Nothing is cached — every call queries the database, so the column selection, 
 
 Both under `Coyote6\LaravelBase\Traits\Database`:
 
-- **`DropsIndexes`** — `dropForeignIfExists(Blueprint $table, string $column, ?string $foreignKey = null)` and `dropIndexIfExists(Blueprint $table, string $column, ?string $foreignKey = null, bool $isForeign = false)`, for migrations that need to safely drop a foreign key/index that may or may not exist yet.
+- **`DropsIndexes`** — `dropForeignIfExists(Blueprint $table, string $column, ?string $foreignKey = null)` and `dropIndexIfExists(Blueprint $table, string $column, ?string $foreignKey = null, bool $isForeign = false)`, for migrations that need to safely drop a foreign key/index that may or may not exist yet; plus `foreignKeysReferencing(string $table): array`, every foreign key across the whole connection whose target is `$table` — what would break if you dropped it. Driven by Laravel's own driver-agnostic schema introspection, so all three work identically on SQLite, MySQL, MariaDB, Postgres, and SQL Server, against whatever connection the composing migration itself targets.
 - **`ServiceProviderSeedsDb`** — `seedDbOnCommand($dir)`, called from a service provider's `boot()` to also run every seeder found in `$dir` whenever `db:seed` runs.
 
 ### File Helpers
@@ -665,6 +665,14 @@ return new class extends Migration {
     }
 
 };
+```
+
+`foreignKeysReferencing()` answers the reverse question — what points *at* a table, useful right before dropping one:
+
+```php
+foreach ($this->foreignKeysReferencing('examples') as $foreign) {
+    // ['referencing_table' => 'orders', 'name' => 'orders_example_id_foreign', 'columns' => ['example_id'], 'foreign_columns' => ['id']]
+}
 ```
 
 ### ServiceProviderSeedsDb

@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-09-28
+
+### Added
+
+- `Traits\Database\DropsIndexes::foreignKeysReferencing(string $table): array`
+  — every foreign key across the whole connection whose target is `$table`,
+  i.e. everything that would break if `$table` were dropped. Built from
+  `Schema::getTables()` + `Schema::getForeignKeys()` (Laravel's own native
+  schema-state layer only exposes a table's *outgoing* keys, never
+  "who references me," on any driver), so this walks every other table and
+  keeps the ones pointing back.
+
+### Fixed
+
+- `DropsIndexes::dropForeignIfExists()` / `dropIndexIfExists()` were
+  MySQL/MariaDB-only — raw `information_schema.KEY_COLUMN_USAGE` /
+  `SHOW INDEXES FROM` queries that don't exist on SQLite, Postgres, or SQL
+  Server; the trait's own test was skip-gated to MySQL/MariaDB for exactly
+  that reason. Rewritten on Laravel's driver-agnostic schema introspection
+  (`Schema\Builder::getForeignKeys()`/`getIndexes()`, implemented per-grammar
+  in the framework itself), so both methods now work identically on every
+  driver — `DropsIndexesTest` runs unskipped as of this release, including
+  in the main sqlite matrix, not just against a real MySQL/MariaDB
+  connection. Also fixes a real, separate bug found along the way: these
+  methods silently always queried the *default* connection, ignoring a
+  migration's own `getConnection()` override — the new `schemaBuilder()`
+  resolves `Schema::connection($this->getConnection())` when the composing
+  class exposes one.
+
 ## [2.2.0] - 2026-09-24
 
 ### Added
